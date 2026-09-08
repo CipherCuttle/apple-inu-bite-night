@@ -1,0 +1,215 @@
+name: phase3-wire
+
+on:
+  push:
+    branches: [phase-3/soulslike-stamina-dodge-v0]
+
+permissions:
+  contents: write
+
+jobs:
+  wire-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-3/soulslike-stamina-dodge-v0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Wire stamina and dodge into deterministic simulation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/game/sim/GameState.ts')
+          text = path.read_text()
+
+          def once(old: str, new: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one match, got {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          once(
+              "import { heroDefinition, type HeroDefinition } from '../build/Hero'\n",
+              "import { createDodgeState, dodgeHasTravel, dodgeIsInvulnerable, type DodgeState } from '../build/Dodge'\n"
+              "import { heroDefinition, type HeroDefinition } from '../build/Hero'\n"
+              "import { createStamina, regenerateStamina, spendStamina, staminaRatio, type Stamina } from '../build/Stamina'\n",
+          )
+          once("  whirlwind?: boolean\n", "  whirlwind?: boolean\n  dodge?: boolean\n")
+          once(
+              "  | { type: 'dash-step'; tick: number; x: number; y: number; facing: number; power: number }\n",
+              "  | { type: 'dash-step'; tick: number; x: number; y: number; facing: number; power: number }\n"
+              "  | { type: 'dodge-start'; tick: number; x: number; y: number; facing: number }\n"
+              "  | { type: 'dodge-step'; tick: number; x: number; y: number; facing: number; invulnerable: boolean }\n"
+              "  | { type: 'dodge-end'; tick: number; x: number; y: number; facing: number }\n",
+          )
+          once("  readonly hero: HeroDefinition\n", "  readonly hero: HeroDefinition\n  readonly stamina: Stamina\n")
+          once("  private dashState: DashState | null = null\n", "  private dashState: DashState | null = null\n  private dodgeState: DodgeState | null = null\n")
+          once(
+              "    this.hero = heroDefinition(this.loadout.heroId)\n    this.player = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: this.hero.baseStats.maxHp, invulnerableTicks: 0 }\n",
+              "    this.hero = heroDefinition(this.loadout.heroId)\n    this.stamina = createStamina(this.hero.staminaProfile)\n    this.player = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: this.hero.baseStats.maxHp, invulnerableTicks: 0 }\n",
+          )
+          once(
+              "    this.updateComboAndBuffTimers()\n    this.updateDashCharge(input)\n    this.updatePlayer(input)\n",
+              "    this.updateComboAndBuffTimers()\n"
+              "    regenerateStamina(this.stamina, this.tick)\n"
+              "    this.updateDashCharge(input)\n"
+              "    if (this.dodgeState) {\n"
+              "      this.advanceDodge()\n"
+              "    } else {\n"
+              "      this.tryStartDodge(input)\n"
+              "      if (this.dodgeState) this.advanceDodge()\n"
+              "      else this.updatePlayer(input)\n"
+              "    }\n",
+          )
+          once(
+              "    if (this.dashState) {\n      this.advanceDash()\n    } else {\n      this.tryWeaponAttack(input)\n      if (this.dashState) this.advanceDash()\n    }\n",
+              "    if (this.dodgeState) {\n      // Dodge travel/recovery owns the action slot for this tick.\n    } else if (this.dashState) {\n      this.advanceDash()\n    } else {\n      this.tryWeaponAttack(input)\n      if (this.dashState) this.advanceDash()\n    }\n",
+          )
+          once(
+              "  dashTicksRemaining(): number {\n    return this.dashState?.remainingTicks ?? 0\n  }\n\n",
+              "  dashTicksRemaining(): number {\n    return this.dashState?.remainingTicks ?? 0\n  }\n\n"
+              "  isDodging(): boolean { return this.dodgeState !== null }\n"
+              "  dodgeTicksRemaining(): number { return this.dodgeState ? Math.max(0, this.dodgeState.totalTicks - this.dodgeState.elapsedTicks) : 0 }\n"
+              "  dodgeInvulnerable(): boolean { return this.dodgeState ? dodgeIsInvulnerable(this.dodgeState, this.hero.dodgeProfile) : false }\n"
+              "  staminaCurrent(): number { return this.stamina.current }\n"
+              "  staminaMax(): number { return this.stamina.max }\n"
+              "  staminaProgress(): number { return staminaRatio(this.stamina) }\n"
+              "  staminaRegenLockedTicks(): number { return Math.max(0, this.stamina.lockedUntilTick - this.tick) }\n\n",
+          )
+          once(
+              "    feed(this.dashChargeTicks)\n    feed(this.rng.snapshot())\n",
+              "    feed(this.dashChargeTicks)\n"
+              "    feed(this.stamina.current)\n"
+              "    feed(this.stamina.max)\n"
+              "    feed(this.stamina.lockedUntilTick)\n"
+              "    feed(this.rng.snapshot())\n",
+          )
+          once(
+              "    if (this.dashState) {\n      feed(1)\n",
+              "    if (this.dodgeState) {\n"
+              "      feed(1)\n"
+              "      feed(this.dodgeState.facing)\n"
+              "      feed(this.dodgeState.elapsedTicks)\n"
+              "      feed(this.dodgeState.totalTicks)\n"
+              "      feed(this.dodgeState.travelTicks)\n"
+              "      feed(this.dodgeState.stepX)\n"
+              "      feed(this.dodgeState.stepY)\n"
+              "      feed(this.dodgeState.blocked ? 1 : 0)\n"
+              "    } else {\n"
+              "      feed(0)\n"
+              "    }\n\n"
+              "    if (this.dashState) {\n      feed(1)\n",
+          )
+          once("    if (this.dashState) {\n      this.dashChargeTicks = 0\n", "    if (this.dashState || this.dodgeState) {\n      this.dashChargeTicks = 0\n")
+          once(
+              "  private updateDashCharge(input: InputState): void {\n",
+              "  private tryStartDodge(input: InputState): void {\n"
+              "    if (!input.dodge || this.dodgeState || this.dashState || input.dashHeld || this.tick < this.nextAttackTick) return\n"
+              "    if (!spendStamina(this.stamina, this.hero.dodgeProfile.staminaCost, this.tick)) return\n"
+              "    const length = Math.hypot(input.x, input.y)\n"
+              "    const facing = length > 0.0001\n"
+              "      ? Math.atan2(input.y, input.x)\n"
+              "      : Number.isFinite(input.aimRadians)\n"
+              "        ? normalizeAngle(input.aimRadians as number)\n"
+              "        : this.player.facing\n"
+              "    this.player.facing = facing\n"
+              "    this.dodgeState = createDodgeState(this.hero.dodgeProfile, facing)\n"
+              "    this.dashChargeTicks = 0\n"
+              "    this.events.push({ type: 'dodge-start', tick: this.tick, x: this.player.x, y: this.player.y, facing })\n"
+              "  }\n\n"
+              "  private advanceDodge(): void {\n"
+              "    const dodge = this.dodgeState\n"
+              "    if (!dodge) return\n"
+              "    if (dodgeHasTravel(dodge)) {\n"
+              "      const startX = this.player.x\n"
+              "      const startY = this.player.y\n"
+              "      const endX = clamp(startX + dodge.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)\n"
+              "      const endY = clamp(startY + dodge.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)\n"
+              "      if (mazeCanOccupy(endX, endY, this.hero.movementProfile.collisionRadius) && !this.playerOverlapsProp(endX, endY)) {\n"
+              "        this.player.x = endX\n"
+              "        this.player.y = endY\n"
+              "      } else {\n"
+              "        dodge.blocked = true\n"
+              "      }\n"
+              "    }\n"
+              "    const invulnerable = dodgeIsInvulnerable(dodge, this.hero.dodgeProfile)\n"
+              "    this.events.push({ type: 'dodge-step', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing, invulnerable })\n"
+              "    dodge.elapsedTicks += 1\n"
+              "    if (dodge.elapsedTicks >= dodge.totalTicks) {\n"
+              "      this.events.push({ type: 'dodge-end', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing })\n"
+              "      this.dodgeState = null\n"
+              "      this.nextAttackTick = Math.max(this.nextAttackTick, this.tick + 1)\n"
+              "    }\n"
+              "  }\n\n"
+              "  private updateDashCharge(input: InputState): void {\n",
+          )
+          once(
+              "    const config = weaponAttackForInput(this.loadout.weaponId, attack)\n    this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)\n",
+              "    const config = weaponAttackForInput(this.loadout.weaponId, attack)\n"
+              "    if (!spendStamina(this.stamina, config.staminaCost, this.tick)) return\n"
+              "    this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)\n",
+          )
+          once(
+              "  private beginDash(chargeTicks: number): void {\n    const config = weaponAttackForInput(this.loadout.weaponId, 'dash')\n",
+              "  private beginDash(chargeTicks: number): void {\n"
+              "    const config = weaponAttackForInput(this.loadout.weaponId, 'dash')\n"
+              "    if (!spendStamina(this.stamina, config.staminaCost, this.tick)) return\n",
+          )
+          once(
+              "    if (this.player.invulnerableTicks > 0 || this.dashState) return\n",
+              "    if (this.player.invulnerableTicks > 0 || this.dashState || this.dodgeInvulnerable()) return\n",
+          )
+
+          path.write_text(text)
+
+          scene = Path('src/game/scenes/GameScene.ts')
+          s = scene.read_text()
+          def s_once(old: str, new: str):
+              global s
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'scene expected one match, got {count}: {old[:100]!r}')
+              s = s.replace(old, new, 1)
+
+          s_once("  private hpText!: Phaser.GameObjects.Text\n", "  private hpText!: Phaser.GameObjects.Text\n  private staminaText!: Phaser.GameObjects.Text\n  private staminaGraphics!: Phaser.GameObjects.Graphics\n")
+          s_once("    keyboard.on('keydown-Q', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueWhirlwind() })\n", "    keyboard.on('keydown-Q', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueWhirlwind() })\n    keyboard.on('keydown-C', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueDodge() })\n")
+          s_once("      whirlwind: keyAttacks.whirlwind,\n", "      whirlwind: keyAttacks.whirlwind,\n      dodge: keyAttacks.dodge,\n")
+          s_once("      if (event.type === 'dash-step') this.spawnDashAfterimage(event)\n", "      if (event.type === 'dash-step') this.spawnDashAfterimage(event)\n      if (event.type === 'dodge-step') this.spawnDodgeAfterimage(event)\n")
+          s_once("    this.player.setAlpha(this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3 ? 0.42 : 1)\n    this.hpText.setText(`HP ${'■'.repeat(Math.max(0, this.state.player.hp))}`)\n", "    this.player.setAlpha((this.state.dodgeInvulnerable() || (this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3)) ? 0.42 : 1)\n    this.hpText.setText(`HP ${'■'.repeat(Math.max(0, this.state.player.hp))}`)\n    this.staminaText.setText(`ST ${Math.floor(this.state.staminaCurrent())}/${this.state.staminaMax()}${this.state.isDodging() ? `  DODGE ${this.state.dodgeTicksRemaining()}t` : ''}`)\n    this.staminaGraphics.clear()\n    this.staminaGraphics.fillStyle(0x17131c, 0.92).fillRect(16, 52, 180, 7)\n    this.staminaGraphics.fillStyle(0xa8e66b, 0.96).fillRect(16, 52, 180 * this.state.staminaProgress(), 7)\n")
+          s_once(
+              "  private spawnPhysicsImpact(event: Extract<SimEvent, { type: 'physics-impact' }>): void {\n",
+              "  private spawnDodgeAfterimage(event: Extract<SimEvent, { type: 'dodge-step' }>): void {\n"
+              "    const body = this.add.ellipse(-4, 0, 28, 17, event.invulnerable ? 0xa8e66b : 0xd8d2c8, 0.12)\n"
+              "    const ghost = this.add.container(WORLD_CX + event.x, WORLD_CY + event.y, [body]).setRotation(event.facing).setDepth(8).setAlpha(0.5)\n"
+              "    this.tweens.add({ targets: ghost, alpha: 0, scaleX: 0.84, scaleY: 0.84, duration: 105, ease: 'Quad.Out', onComplete: () => ghost.destroy() })\n"
+              "  }\n\n"
+              "  private spawnPhysicsImpact(event: Extract<SimEvent, { type: 'physics-impact' }>): void {\n",
+          )
+          s_once("    this.hpText = this.add.text(16, 14, '', style).setDepth(100)\n", "    this.hpText = this.add.text(16, 14, '', style).setDepth(100)\n    this.staminaText = this.add.text(16, 34, '', { ...style, fontSize: '12px', color: '#c8f58a' }).setDepth(100)\n    this.staminaGraphics = this.add.graphics().setDepth(99)\n")
+          s_once("WASD MOVE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART", "WASD MOVE • C DODGE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART")
+          scene.write_text(s)
+          PY
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:determinism
+      - name: Commit wired phase
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/sim/GameState.ts src/game/scenes/GameScene.ts
+          git diff --cached --check
+          git commit -m "feat(phase3): wire stamina and committed dodge"
+          git push
