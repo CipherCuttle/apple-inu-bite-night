@@ -70,12 +70,13 @@ jobs:
           PY
           python scripts/patch-rescue-level-v0.py
           python scripts/patch-head-only.py
+          python scripts/patch-rescue-fix.py
       - name: Remove one-shot tooling
-        run: rm scripts/patch-rescue-level-v0.py scripts/patch-head-only.py .github/workflows/rescue-level-v0.yml
+        run: rm scripts/patch-rescue-level-v0.py scripts/patch-head-only.py scripts/patch-rescue-fix.py .github/workflows/rescue-level-v0.yml .github/workflows/rescue-debug.yml
       - name: Verify
         run: |
           pnpm install --frozen-lockfile
-          pnpm exec tsc -p tsconfig.json --noEmit --pretty false
+          pnpm typecheck
           pnpm lint
           pnpm test
           pnpm build
