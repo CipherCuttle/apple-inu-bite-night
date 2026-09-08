@@ -460,10 +460,16 @@ export class GameState {
         const invA = 1 / a.mass
         const invB = 1 / b.mass
         const invTotal = invA + invB
+        const oldAx = a.x
+        const oldAy = a.y
+        const oldBx = b.x
+        const oldBy = b.y
         a.x -= nx * overlap * (invA / invTotal)
         a.y -= ny * overlap * (invA / invTotal)
         b.x += nx * overlap * (invB / invTotal)
         b.y += ny * overlap * (invB / invTotal)
+        if (!mazeCanOccupy(a.x, a.y, a.radius)) { a.x = oldAx; a.y = oldAy }
+        if (!mazeCanOccupy(b.x, b.y, b.radius)) { b.x = oldBx; b.y = oldBy }
 
         const relativeNormalVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny
         if (relativeNormalVelocity >= 0) continue
