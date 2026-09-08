@@ -49,6 +49,16 @@ replace(
     '''    return build_model(tex, out, "QuadSprite",\n                       6.0f, 4.0f,\n                       names, starts, ends, 1) ? 0 : 1;\n''',
 )
 
+# The upstream preview camera is intentionally shallow because it previews MDX
+# models, not an RTS board. The smoke ground is an XY plane, so that camera made
+# a healthy draw collapse to a ~6px strip. Use a browser-smoke-only high RTS
+# camera while preserving the ordinary preview camera for every native path.
+replace(
+    "client/cl_view.c",
+    '''        if (wasm_smoke) {\n            VECTOR3 target = { 0, 0, 0 };\n            Matrix4_getPreviewCameraMatrix(&target, &cl.viewDef.viewProjectionMatrix);\n            Matrix4_getPreviewLightMatrix(&lightAngles, &target, VIEW_SHADOW_SIZE, &cl.viewDef.lightMatrix);\n        } else\n''',
+    '''        if (wasm_smoke) {\n            MATRIX4 smoke_proj, smoke_view;\n            size2_t smoke_window = re.GetWindowSize();\n            VECTOR3 target = { 0, 0, 0 };\n            VECTOR3 eye = { 0.0f, -180.0f, 700.0f };\n            VECTOR3 dir = Vector3_sub(&target, &eye);\n            FLOAT aspect = smoke_window.height > 0\n                ? (FLOAT)smoke_window.width / (FLOAT)smoke_window.height\n                : 1.0f;\n            Matrix4_perspective(&smoke_proj, 45.0f, aspect, 10.0f, 4000.0f);\n            Matrix4_lookAt(&smoke_view, &eye, &dir, &(VECTOR3){0, 0, 1});\n            Matrix4_multiply(&smoke_proj, &smoke_view, &cl.viewDef.viewProjectionMatrix);\n            Matrix4_getPreviewLightMatrix(&lightAngles, &target, VIEW_SHADOW_SIZE, &cl.viewDef.lightMatrix);\n        } else\n''',
+)
+
 # Strengthen gate 5: renderer-list admission is not enough. Emit smoke evidence
 # only from the actual entity draw loop, after visibility/model checks have
 # passed and immediately before R_DrawEntity executes.
