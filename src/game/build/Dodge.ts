@@ -15,6 +15,7 @@ export interface DodgeState {
   stepX: number
   stepY: number
   blocked: boolean
+  invulnerableThisTick: boolean
 }
 
 export function createDodgeState(profile: DodgeProfile, facing: number): DodgeState {
@@ -32,6 +33,7 @@ export function createDodgeState(profile: DodgeProfile, facing: number): DodgeSt
     stepX: Math.cos(facing) * (profile.distance / profile.travelTicks),
     stepY: Math.sin(facing) * (profile.distance / profile.travelTicks),
     blocked: false,
+    invulnerableThisTick: false,
   }
 }
 
