@@ -66,6 +66,7 @@ jobs:
               "    this.ensurePopulation()\n"
               "  }",
           )
+          replace_exact('PLAYER_MAX_HP', 'this.hero.baseStats.maxHp', expected=1)
           replace_exact("      this.trySwordAttack(input)\n", "      this.tryWeaponAttack(input)\n")
           replace_exact("  private trySwordAttack(input: InputState): void {\n", "  private tryWeaponAttack(input: InputState): void {\n")
           replace_exact("    const config = swordForAttack(attack)\n", "    const config = weaponAttackForInput(this.loadout.weaponId, attack)\n")
@@ -95,13 +96,17 @@ jobs:
               "    for (let i = 0; i < fingerprint.length; i += 1) feed(fingerprint.charCodeAt(i))\n",
           )
 
-          for legacy in ('swordForAttack', 'trySwordAttack', 'PLAYER_RADIUS', 'PLAYER_SPEED', "type: 'sword-attack'"):
+          for legacy in ('swordForAttack', 'trySwordAttack', 'PLAYER_MAX_HP', 'PLAYER_RADIUS', 'PLAYER_SPEED', "type: 'sword-attack'"):
               if legacy in text:
                   raise SystemExit(f'legacy hard-coded combat/player symbol remains: {legacy}')
 
           path.write_text(text)
 
-          for other in [Path('src/game/scenes/GameScene.ts'), Path('tests/special-attacks.test.ts')]:
+          for other in [
+              Path('src/game/scenes/GameScene.ts'),
+              Path('tests/special-attacks.test.ts'),
+              Path('tests/manual-combat.test.ts'),
+          ]:
               other_text = other.read_text()
               if 'sword-attack' not in other_text:
                   raise SystemExit(f'expected legacy event name in {other}')
@@ -134,7 +139,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/game/sim/GameState.ts src/game/scenes/GameScene.ts tests/special-attacks.test.ts tests/build-kernel.test.ts
+          git add src/game/sim/GameState.ts src/game/scenes/GameScene.ts tests/special-attacks.test.ts tests/manual-combat.test.ts tests/build-kernel.test.ts
           git diff --cached --check
           git commit -m "feat: wire loadout kernel into deterministic combat"
           git push
