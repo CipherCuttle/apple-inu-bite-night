@@ -6,6 +6,7 @@ describe('GoreBudget', () => {
   it('caps loud and filler gore independently', () => {
     const events: SimEvent[] = Array.from({ length: 30 }, (_, i) => ({
       type: 'enemy-hit' as const,
+      attack: 'slash' as const,
       tick: 1,
       enemyId: i + 1,
       x: 0,
@@ -17,4 +18,4 @@ describe('GoreBudget', () => {
     expect(selected.major).toHaveLength(3)
     expect(selected.minor).toHaveLength(5)
   })
-})
+}
