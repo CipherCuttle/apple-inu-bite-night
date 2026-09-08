@@ -44,18 +44,43 @@ describe('soulslike stamina / dodge v0', () => {
     expect(state.events.some((event) => event.type === 'dodge-step')).toBe(true)
   })
 
-  it('has a bounded iframe window followed by vulnerable recovery', () => {
+  it('has exactly six iframe ticks followed by vulnerable recovery', () => {
     const state = new GameState(304, DEFAULT_LOADOUT)
     state.player.hp = 999
     state.step({ x: 1, y: 0, dodge: true })
     expect(state.dodgeInvulnerable()).toBe(true)
 
-    for (let i = 0; i < 4; i += 1) state.step({ x: 0, y: 0 })
+    for (let i = 0; i < 5; i += 1) state.step({ x: 0, y: 0 })
     expect(state.dodgeInvulnerable()).toBe(true)
 
     state.step({ x: 0, y: 0 })
     expect(state.isDodging()).toBe(true)
     expect(state.dodgeInvulnerable()).toBe(false)
+  })
+
+  it('protects enemy contact on iframe tick six but not tick seven', () => {
+    const state = new GameState(307, DEFAULT_LOADOUT)
+    state.player.hp = 999
+    state.step({ x: 1, y: 0, dodge: true })
+    for (let i = 0; i < 4; i += 1) state.step({ x: 0, y: 0 })
+
+    const target = state.enemies.items.find((enemy) => enemy.active)
+    expect(target).toBeDefined()
+    if (!target) return
+    target.speed = 0
+    target.impulseX = 0
+    target.impulseY = 0
+    target.x = state.player.x + state.hero.dodgeProfile.distance / state.hero.dodgeProfile.travelTicks
+    target.y = state.player.y
+
+    const hpBeforeTickSix = state.player.hp
+    state.step({ x: 0, y: 0 })
+    expect(state.events.some((event) => event.type === 'player-hit')).toBe(false)
+    expect(state.player.hp).toBe(hpBeforeTickSix)
+
+    state.step({ x: 0, y: 0 })
+    expect(state.events.some((event) => event.type === 'player-hit')).toBe(true)
+    expect(state.player.hp).toBe(hpBeforeTickSix - 1)
   })
 
   it('does not allow dodge to cancel an active attack cooldown', () => {
