@@ -9,6 +9,9 @@ export interface InputState {
   aimRadians?: number
   slash?: boolean
   stab?: boolean
+  dashHeld?: boolean
+  dashReleased?: boolean
+  whirlwind?: boolean
 }
 
 export interface PlayerState {
@@ -20,14 +23,36 @@ export interface PlayerState {
 }
 
 export type SimEvent =
-  | { type: 'sword-attack'; attack: AttackKind; tick: number; x: number; y: number; facing: number }
-  | { type: 'enemy-hit'; attack: AttackKind; tick: number; enemyId: number; x: number; y: number; killed: boolean; facing: number }
+  | {
+      type: 'sword-attack'
+      attack: AttackKind
+      tick: number
+      x: number
+      y: number
+      facing: number
+      power?: number
+      distance?: number
+    }
+  | {
+      type: 'enemy-hit'
+      attack: AttackKind
+      tick: number
+      enemyId: number
+      x: number
+      y: number
+      killed: boolean
+      facing: number
+    }
   | { type: 'player-hit'; tick: number; hp: number }
   | { type: 'run-ended'; tick: number; kills: number }
 
 const PLAYER_SPEED = 3.25
 const PLAYER_RADIUS = 14
 const TARGET_ENEMIES = 120
+const DASH_MIN_DISTANCE = 48
+const DASH_MAX_BONUS_DISTANCE = 150
+const DASH_HIT_RADIUS = 24
+export const MAX_DASH_CHARGE_TICKS = 60
 
 export const ARENA_BOUNDS = {
   halfWidth: 430,
@@ -44,6 +69,7 @@ export class GameState {
   kills = 0
   ended = false
   private nextAttackTick = 0
+  private dashChargeTicks = 0
 
   constructor(seed: number) {
     this.seed = seed >>> 0
@@ -56,6 +82,7 @@ export class GameState {
     this.events.length = 0
     this.tick += 1
 
+    this.updateDashCharge(input)
     this.updatePlayer(input)
     this.updateEnemies()
     this.trySwordAttack(input)
@@ -67,6 +94,10 @@ export class GameState {
       this.ended = true
       this.events.push({ type: 'run-ended', tick: this.tick, kills: this.kills })
     }
+  }
+
+  dashChargeRatio(): number {
+    return Math.min(1, this.dashChargeTicks / MAX_DASH_CHARGE_TICKS)
   }
 
   resultHash(): string {
@@ -84,6 +115,7 @@ export class GameState {
     feed(this.player.facing)
     feed(this.player.hp)
     feed(this.nextAttackTick)
+    feed(this.dashChargeTicks)
     feed(this.rng.snapshot())
 
     for (const enemy of this.enemies.items) {
@@ -97,13 +129,23 @@ export class GameState {
     return hash.toString(16).padStart(8, '0')
   }
 
+  private updateDashCharge(input: InputState): void {
+    if (input.dashHeld) {
+      this.dashChargeTicks = Math.min(MAX_DASH_CHARGE_TICKS, this.dashChargeTicks + 1)
+      return
+    }
+    if (!input.dashReleased && this.dashChargeTicks > 0) this.dashChargeTicks = 0
+  }
+
   private updatePlayer(input: InputState): void {
     const length = Math.hypot(input.x, input.y)
     if (length > 0.0001) {
       const nx = input.x / Math.max(1, length)
       const ny = input.y / Math.max(1, length)
-      this.player.x = clamp(this.player.x + nx * PLAYER_SPEED, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-      this.player.y = clamp(this.player.y + ny * PLAYER_SPEED, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
+      const chargeSlowdown = input.dashHeld ? 0.55 : 1
+      const speed = PLAYER_SPEED * chargeSlowdown
+      this.player.x = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
+      this.player.y = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
       if (!Number.isFinite(input.aimRadians)) this.player.facing = Math.atan2(ny, nx)
     }
 
@@ -126,8 +168,15 @@ export class GameState {
   }
 
   private trySwordAttack(input: InputState): void {
-    const attack: AttackKind | null = input.stab ? 'stab' : input.slash ? 'slash' : null
-    if (!attack || this.tick < this.nextAttackTick) return
+    if (input.dashReleased) {
+      const chargeTicks = this.dashChargeTicks
+      this.dashChargeTicks = 0
+      if (this.tick >= this.nextAttackTick) this.performDash(chargeTicks)
+      return
+    }
+
+    const attack: AttackKind | null = input.whirlwind ? 'whirlwind' : input.stab ? 'stab' : input.slash ? 'slash' : null
+    if (!attack || input.dashHeld || this.tick < this.nextAttackTick) return
 
     const config = swordForAttack(attack)
     this.nextAttackTick = this.tick + config.cooldownTicks
@@ -137,29 +186,69 @@ export class GameState {
       if (!enemy.active) continue
       if (!isPointInSwordArc(this.player.x, this.player.y, this.player.facing, enemy.x, enemy.y, enemy.radius, config)) continue
 
-      enemy.hp -= config.damage
-      const killed = enemy.hp <= 0
-      const hitX = enemy.x
-      const hitY = enemy.y
-      enemy.x += Math.cos(this.player.facing) * config.knockback
-      enemy.y += Math.sin(this.player.facing) * config.knockback
-
-      if (killed) {
-        this.kills += 1
-        this.enemies.kill(enemy)
-      }
-
-      this.events.push({
-        type: 'enemy-hit',
-        attack,
-        tick: this.tick,
-        enemyId: enemy.id,
-        x: hitX,
-        y: hitY,
-        killed,
-        facing: this.player.facing,
-      })
+      const hitFacing = attack === 'whirlwind' ? Math.atan2(enemy.y - this.player.y, enemy.x - this.player.x) : this.player.facing
+      this.hitEnemy(enemy, attack, config.damage, config.knockback, hitFacing)
     }
+  }
+
+  private performDash(chargeTicks: number): void {
+    const config = swordForAttack('dash')
+    const power = Math.min(1, Math.max(0, chargeTicks) / MAX_DASH_CHARGE_TICKS)
+    const requestedDistance = DASH_MIN_DISTANCE + DASH_MAX_BONUS_DISTANCE * power
+    const startX = this.player.x
+    const startY = this.player.y
+    const endX = clamp(startX + Math.cos(this.player.facing) * requestedDistance, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
+    const endY = clamp(startY + Math.sin(this.player.facing) * requestedDistance, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
+    const actualDistance = Math.hypot(endX - startX, endY - startY)
+    const damage = config.damage + Math.floor(power * 2)
+    const knockback = config.knockback + power * 38
+
+    this.nextAttackTick = this.tick + config.cooldownTicks
+    this.events.push({
+      type: 'sword-attack',
+      attack: 'dash',
+      tick: this.tick,
+      x: startX,
+      y: startY,
+      facing: this.player.facing,
+      power,
+      distance: actualDistance,
+    })
+
+    for (const enemy of this.enemies.items) {
+      if (!enemy.active) continue
+      const hitRadius = DASH_HIT_RADIUS + enemy.radius
+      if (distanceSqPointToSegment(enemy.x, enemy.y, startX, startY, endX, endY) > hitRadius * hitRadius) continue
+      this.hitEnemy(enemy, 'dash', damage, knockback, this.player.facing)
+    }
+
+    this.player.x = endX
+    this.player.y = endY
+  }
+
+  private hitEnemy(enemy: EnemyState, attack: AttackKind, damage: number, knockback: number, facing: number): void {
+    enemy.hp -= damage
+    const killed = enemy.hp <= 0
+    const hitX = enemy.x
+    const hitY = enemy.y
+    enemy.x += Math.cos(facing) * knockback
+    enemy.y += Math.sin(facing) * knockback
+
+    if (killed) {
+      this.kills += 1
+      this.enemies.kill(enemy)
+    }
+
+    this.events.push({
+      type: 'enemy-hit',
+      attack,
+      tick: this.tick,
+      enemyId: enemy.id,
+      x: hitX,
+      y: hitY,
+      killed,
+      facing,
+    })
   }
 
   private resolveEnemyContact(): void {
@@ -184,6 +273,19 @@ export class GameState {
       if (!this.enemies.spawnAround(this.player.x, this.player.y, this.rng)) break
     }
   }
+}
+
+function distanceSqPointToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const abx = bx - ax
+  const aby = by - ay
+  const apx = px - ax
+  const apy = py - ay
+  const lengthSq = abx * abx + aby * aby
+  if (lengthSq <= 0.000001) return apx * apx + apy * apy
+  const t = clamp((apx * abx + apy * aby) / lengthSq, 0, 1)
+  const dx = px - (ax + abx * t)
+  const dy = py - (ay + aby * t)
+  return dx * dx + dy * dy
 }
 
 function clamp(value: number, min: number, max: number): number {
