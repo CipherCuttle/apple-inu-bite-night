@@ -4,6 +4,17 @@ import type { EnemyState } from '../enemies/Enemy'
 import { createImpactProps, type PropMaterial, type PropState } from '../world/Props'
 import { XorShift32 } from './RNG'
 
+export type PowerupKind = 'frenzy' | 'freeze' | 'apple-juice'
+
+export interface PowerupState {
+  id: number
+  kind: PowerupKind
+  x: number
+  y: number
+  active: boolean
+  ttlTicks: number
+}
+
 export interface InputState {
   x: number
   y: number
@@ -71,6 +82,10 @@ export type SimEvent =
       broken: boolean
     }
   | { type: 'player-hit'; tick: number; hp: number }
+  | { type: 'combo-tier'; tick: number; comboKills: number; multiplier: number; attackSpeed: number }
+  | { type: 'flow-freeze'; tick: number; durationTicks: number; source: 'combo' | 'powerup' }
+  | { type: 'powerup-drop'; tick: number; powerupId: number; kind: PowerupKind; x: number; y: number }
+  | { type: 'powerup-picked'; tick: number; powerupId: number; kind: PowerupKind }
   | { type: 'run-ended'; tick: number; kills: number }
 
 interface DashState {
@@ -86,7 +101,7 @@ interface DashState {
 
 const PLAYER_SPEED = 3.25
 const PLAYER_RADIUS = 14
-const TARGET_ENEMIES = 120
+export const TARGET_ENEMIES = 48
 const DASH_MIN_DISTANCE = 48
 const DASH_MAX_BONUS_DISTANCE = 150
 const DASH_HIT_RADIUS = 24
@@ -101,6 +116,16 @@ const ENEMY_COLLISION_DAMAGE_THRESHOLD = 2.8
 const ENEMY_RESTITUTION = 0.42
 const PROP_RESTITUTION = 0.28
 export const MAX_DASH_CHARGE_TICKS = 60
+const COMBO_WINDOW_TICKS = 150
+const FLOW_FREEZE_EVERY_KILLS = 8
+const FLOW_FREEZE_TICKS = 36
+const POWERUP_DROP_EVERY_KILLS = 6
+const POWERUP_TTL_TICKS = 600
+const POWERUP_PICKUP_RADIUS = 28
+const FRENZY_TICKS = 360
+const FRENZY_ATTACK_SPEED = 1.45
+const POWERUP_FREEZE_TICKS = 90
+const PLAYER_MAX_HP = 5
 
 export const ARENA_BOUNDS = {
   halfWidth: 430,
@@ -112,11 +137,18 @@ export class GameState {
   readonly rng: XorShift32
   readonly enemies = new EnemyPool(220)
   readonly props: PropState[] = createImpactProps()
-  readonly player: PlayerState = { x: 0, y: 0, facing: 0, hp: 5, invulnerableTicks: 0 }
+  readonly player: PlayerState = { x: 0, y: 0, facing: 0, hp: PLAYER_MAX_HP, invulnerableTicks: 0 }
   readonly events: SimEvent[] = []
+  readonly powerups: PowerupState[] = []
   tick = 0
   kills = 0
+  score = 0
+  comboKills = 0
   ended = false
+  private comboTicksRemaining = 0
+  private worldFreezeTicks = 0
+  private frenzyTicks = 0
+  private nextPowerupId = 1
   private nextAttackTick = 0
   private dashChargeTicks = 0
   private dashState: DashState | null = null
@@ -132,11 +164,16 @@ export class GameState {
     this.events.length = 0
     this.tick += 1
 
+    this.updateComboAndBuffTimers()
     this.updateDashCharge(input)
     this.updatePlayer(input)
-    this.updateEnemies()
-    this.resolveEnemyEnemyCollisions()
-    this.resolveEnemyPropCollisions()
+
+    const worldFrozen = this.worldFreezeTicks > 0
+    if (!worldFrozen) {
+      this.updateEnemies()
+      this.resolveEnemyEnemyCollisions()
+      this.resolveEnemyPropCollisions()
+    }
 
     if (this.dashState) {
       this.advanceDash()
@@ -145,9 +182,12 @@ export class GameState {
       if (this.dashState) this.advanceDash()
     }
 
-    this.resolveEnemyContact()
+    this.updatePowerups()
+    if (!worldFrozen) this.resolveEnemyContact()
     this.ensurePopulation()
 
+    if (this.worldFreezeTicks > 0) this.worldFreezeTicks -= 1
+    if (this.frenzyTicks > 0) this.frenzyTicks -= 1
     if (this.player.invulnerableTicks > 0) this.player.invulnerableTicks -= 1
     if (this.player.hp <= 0 && !this.ended) {
       this.ended = true
@@ -167,6 +207,30 @@ export class GameState {
     return this.dashState?.remainingTicks ?? 0
   }
 
+  comboMultiplier(): number {
+    if (this.comboKills >= 12) return 4
+    if (this.comboKills >= 8) return 3
+    if (this.comboKills >= 4) return 2
+    return 1
+  }
+
+  attackSpeedMultiplier(): number {
+    const comboBoost = this.comboKills >= 12 ? 1.35 : this.comboKills >= 8 ? 1.25 : this.comboKills >= 4 ? 1.12 : 1
+    return comboBoost * (this.frenzyTicks > 0 ? FRENZY_ATTACK_SPEED : 1)
+  }
+
+  comboTimeRemaining(): number {
+    return this.comboTicksRemaining
+  }
+
+  freezeTicksRemaining(): number {
+    return this.worldFreezeTicks
+  }
+
+  frenzyTicksRemaining(): number {
+    return this.frenzyTicks
+  }
+
   resultHash(): string {
     let hash = 2166136261 >>> 0
     const feed = (value: number) => {
@@ -177,6 +241,12 @@ export class GameState {
 
     feed(this.tick)
     feed(this.kills)
+    feed(this.score)
+    feed(this.comboKills)
+    feed(this.comboTicksRemaining)
+    feed(this.worldFreezeTicks)
+    feed(this.frenzyTicks)
+    feed(this.nextPowerupId)
     feed(this.player.x)
     feed(this.player.y)
     feed(this.player.facing)
@@ -198,6 +268,15 @@ export class GameState {
       for (const id of this.dashState.hitPropIds) feed(id)
     } else {
       feed(0)
+    }
+
+    for (const powerup of this.powerups) {
+      feed(powerup.id)
+      feed(powerup.kind === 'frenzy' ? 1 : powerup.kind === 'freeze' ? 2 : 3)
+      feed(powerup.x)
+      feed(powerup.y)
+      feed(powerup.active ? 1 : 0)
+      feed(powerup.ttlTicks)
     }
 
     for (const prop of this.props) {
@@ -254,7 +333,8 @@ export class GameState {
     const nx = input.x / Math.max(1, length)
     const ny = input.y / Math.max(1, length)
     const chargeSlowdown = input.dashHeld ? 0.55 : 1
-    const speed = PLAYER_SPEED * chargeSlowdown
+    const flowMoveBoost = this.comboMultiplier() >= 3 ? 1.08 : 1
+    const speed = PLAYER_SPEED * chargeSlowdown * flowMoveBoost
     const nextX = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
     if (!this.playerOverlapsProp(nextX, this.player.y)) this.player.x = nextX
     const nextY = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
@@ -416,7 +496,7 @@ export class GameState {
     if (!attack || input.dashHeld || this.tick < this.nextAttackTick) return
 
     const config = swordForAttack(attack)
-    this.nextAttackTick = this.tick + config.cooldownTicks
+    this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)
     this.events.push({ type: 'sword-attack', attack, tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
 
     for (const enemy of this.enemies.items) {
@@ -448,7 +528,7 @@ export class GameState {
     const actualDistance = Math.hypot(endX - startX, endY - startY)
     const totalTicks = DASH_MIN_TRAVEL_TICKS + Math.round(power * DASH_MAX_BONUS_TICKS)
 
-    this.nextAttackTick = this.tick + config.cooldownTicks
+    this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)
     this.dashState = {
       facing,
       power,
@@ -534,7 +614,7 @@ export class GameState {
     }
 
     if (killed) {
-      this.kills += 1
+      this.registerKill(hitX, hitY)
       this.enemies.kill(enemy)
     } else {
       const impulse = (knockback * IMPULSE_SCALE) / Math.max(0.6, enemy.mass)
@@ -569,7 +649,7 @@ export class GameState {
     enemy.hp -= 1
     const killed = enemy.hp <= 0
     if (killed) {
-      this.kills += 1
+      this.registerKill(x, y)
       this.enemies.kill(enemy)
     } else {
       enemy.staggerTicks = Math.max(enemy.staggerTicks, STAGGER_TICKS)
@@ -586,6 +666,83 @@ export class GameState {
       propId,
       killed,
     })
+  }
+
+  private scaledCooldown(baseTicks: number): number {
+    return Math.max(6, Math.round(baseTicks / this.attackSpeedMultiplier()))
+  }
+
+  private updateComboAndBuffTimers(): void {
+    if (this.comboTicksRemaining > 0) {
+      this.comboTicksRemaining -= 1
+      if (this.comboTicksRemaining === 0) this.comboKills = 0
+    }
+  }
+
+  private registerKill(x: number, y: number): void {
+    const previousMultiplier = this.comboMultiplier()
+    this.kills += 1
+    this.comboKills += 1
+    this.comboTicksRemaining = COMBO_WINDOW_TICKS
+    const multiplier = this.comboMultiplier()
+    this.score += 100 * multiplier
+
+    if (multiplier !== previousMultiplier) {
+      this.events.push({
+        type: 'combo-tier',
+        tick: this.tick,
+        comboKills: this.comboKills,
+        multiplier,
+        attackSpeed: this.attackSpeedMultiplier(),
+      })
+    }
+
+    if (this.comboKills > 0 && this.comboKills % FLOW_FREEZE_EVERY_KILLS === 0) {
+      this.worldFreezeTicks = Math.max(this.worldFreezeTicks, FLOW_FREEZE_TICKS)
+      this.events.push({ type: 'flow-freeze', tick: this.tick, durationTicks: FLOW_FREEZE_TICKS, source: 'combo' })
+    }
+
+    if (this.kills % POWERUP_DROP_EVERY_KILLS === 0) this.dropPowerup(x, y)
+  }
+
+  private dropPowerup(x: number, y: number): void {
+    const roll = this.rng.next()
+    const kind: PowerupKind = roll < 0.4 ? 'frenzy' : roll < 0.72 ? 'freeze' : 'apple-juice'
+    const powerup: PowerupState = {
+      id: this.nextPowerupId++,
+      kind,
+      x,
+      y,
+      active: true,
+      ttlTicks: POWERUP_TTL_TICKS,
+    }
+    this.powerups.push(powerup)
+    this.events.push({ type: 'powerup-drop', tick: this.tick, powerupId: powerup.id, kind, x, y })
+  }
+
+  private updatePowerups(): void {
+    for (const powerup of this.powerups) {
+      if (!powerup.active) continue
+      powerup.ttlTicks -= 1
+      if (powerup.ttlTicks <= 0) {
+        powerup.active = false
+        continue
+      }
+      const dx = powerup.x - this.player.x
+      const dy = powerup.y - this.player.y
+      if (dx * dx + dy * dy > POWERUP_PICKUP_RADIUS * POWERUP_PICKUP_RADIUS) continue
+
+      powerup.active = false
+      if (powerup.kind === 'frenzy') {
+        this.frenzyTicks = Math.max(this.frenzyTicks, FRENZY_TICKS)
+      } else if (powerup.kind === 'freeze') {
+        this.worldFreezeTicks = Math.max(this.worldFreezeTicks, POWERUP_FREEZE_TICKS)
+        this.events.push({ type: 'flow-freeze', tick: this.tick, durationTicks: POWERUP_FREEZE_TICKS, source: 'powerup' })
+      } else {
+        this.player.hp = Math.min(PLAYER_MAX_HP, this.player.hp + 1)
+      }
+      this.events.push({ type: 'powerup-picked', tick: this.tick, powerupId: powerup.id, kind: powerup.kind })
+    }
   }
 
   private damageProp(prop: PropState, damage: number, force: number): void {

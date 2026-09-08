@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { BASE_SWORD, type AttackKind } from '../combat/Sword'
 import { DesktopCombatInput } from '../input/DesktopCombatInput'
-import { ARENA_BOUNDS, GameState, type InputState, type SimEvent } from '../sim/GameState'
+import { ARENA_BOUNDS, GameState, type InputState, type PowerupKind, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import type { PropMaterial } from '../world/Props'
 import { GoreFx } from '../../presentation/GoreFx'
@@ -31,6 +31,10 @@ export class GameScene extends Phaser.Scene {
   private hpText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
   private killText!: Phaser.GameObjects.Text
+  private comboText!: Phaser.GameObjects.Text
+  private buffText!: Phaser.GameObjects.Text
+  private flowBanner?: Phaser.GameObjects.Text
+  private powerupSprites = new Map<number, Phaser.GameObjects.Container>()
   private zombieSprites: Phaser.GameObjects.Image[] = []
   private propSprites: Phaser.GameObjects.Container[] = []
   private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
@@ -181,6 +185,10 @@ export class GameScene extends Phaser.Scene {
         if (event.broken) this.spawnPropBurst(event)
         else this.cameras.main.shake(35, Math.min(0.0028, 0.0008 + event.force * 0.00008))
       }
+      if (event.type === 'combo-tier') this.showComboTier(event)
+      if (event.type === 'flow-freeze') this.showFlowFreeze(event)
+      if (event.type === 'powerup-drop') this.spawnPowerupRenderer(event.powerupId, event.kind, event.x, event.y)
+      if (event.type === 'powerup-picked') this.showPowerupPickup(event.kind)
       if (event.type === 'player-hit') {
         this.cameras.main.flash(90, 190, 18, 46, false)
         this.sfx.hurt()
@@ -195,7 +203,15 @@ export class GameScene extends Phaser.Scene {
     this.player.setAlpha(this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3 ? 0.42 : 1)
     this.hpText.setText(`HP ${'■'.repeat(Math.max(0, this.state.player.hp))}`)
     this.timerText.setText(`SURVIVE ${(this.state.tick / 60).toFixed(1)}s`)
-    this.killText.setText(`KILLS ${this.state.kills}`)
+    this.killText.setText(`KILLS ${this.state.kills}  •  SCORE ${this.state.score}`)
+    const multiplier = this.state.comboMultiplier()
+    const comboWindow = this.state.comboTimeRemaining()
+    this.comboText.setText(this.state.comboKills > 0 ? `CHAIN ${this.state.comboKills}  ×${multiplier}  CUT ${this.state.attackSpeedMultiplier().toFixed(2)}×  ${Math.ceil(comboWindow / 60)}s` : 'CHAIN —')
+    const buffs: string[] = []
+    if (this.state.freezeTicksRemaining() > 0) buffs.push(`TIME FROZEN ${(this.state.freezeTicksRemaining() / 60).toFixed(1)}s`)
+    if (this.state.frenzyTicksRemaining() > 0) buffs.push(`FRENZY ${(this.state.frenzyTicksRemaining() / 60).toFixed(1)}s`)
+    this.buffText.setText(buffs.join('  •  '))
+    this.syncPowerupRenderers()
 
     for (let i = 0; i < this.zombieSprites.length; i += 1) {
       const sprite = this.zombieSprites[i]
@@ -338,16 +354,21 @@ export class GameScene extends Phaser.Scene {
     const pawFrontTop = this.add.ellipse(5, -15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(-0.12)
     const pawFrontBottom = this.add.ellipse(5, 15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(0.12)
 
-    // Apple-product-like bitten-apple silhouette, rendered as the head itself.
-    const headOutline = this.add.ellipse(15, 0, 43, 41, dark)
-    const appleMid = this.add.ellipse(14, 1, 35, 35, fur)
-    const appleLobeTop = this.add.circle(8, -10, 13, furHighlight)
-    const appleLobeBottom = this.add.circle(8, 10, 13, fur)
-    const appleFront = this.add.ellipse(20, 1, 26, 31, fur)
-    const biteUpper = this.add.circle(32, -5, 6, dark)
-    const biteLower = this.add.circle(33, 5, 5, dark)
-    const stem = this.add.rectangle(13, -22, 4, 9, 0x79513a).setRotation(0.22)
-    const leaf = this.add.ellipse(5, -26, 17, 8, green).setStrokeStyle(2, dark).setRotation(-0.42)
+    // Silhouette-first bitten apple head: strong top cleft + stepped side bite + tapered lower body.
+    const headOutline = this.add.ellipse(13, 1, 46, 43, dark)
+    const appleLower = this.add.ellipse(12, 6, 35, 31, fur)
+    const appleLobeRear = this.add.circle(4, -8, 14, furHighlight)
+    const appleLobeFront = this.add.circle(18, -8, 14, fur)
+    const appleCenter = this.add.ellipse(11, 0, 34, 35, fur)
+    const topCleft = this.add.triangle(11, -21, -5, 0, 5, 0, 0, 10, dark).setRotation(Math.PI)
+    const bottomTaperLeft = this.add.circle(-5, 18, 6, dark)
+    const bottomTaperRight = this.add.circle(28, 18, 6, dark)
+    // Oversized three-step bite notch must read at gameplay scale.
+    const biteUpper = this.add.circle(31, -8, 7, dark)
+    const biteMiddle = this.add.circle(35, 0, 7, dark)
+    const biteLower = this.add.circle(31, 8, 7, dark)
+    const stem = this.add.rectangle(11, -24, 4, 10, 0x79513a).setRotation(0.22)
+    const leaf = this.add.ellipse(2, -29, 19, 9, green).setStrokeStyle(2, dark).setRotation(-0.48)
 
     // Side-bite clamp: sword hilt is physically layered between lower and upper jaw.
     const lowerJaw = this.add.ellipse(SWORD_MOUTH_X - 2, 4, 18, 8, furShade).setStrokeStyle(2, dark)
@@ -363,11 +384,15 @@ export class GameScene extends Phaser.Scene {
     this.headRig = this.add.container(0, 0, [
       ...this.swordTrails,
       headOutline,
-      appleMid,
-      appleLobeTop,
-      appleLobeBottom,
-      appleFront,
+      appleLower,
+      appleLobeRear,
+      appleLobeFront,
+      appleCenter,
+      topCleft,
+      bottomTaperLeft,
+      bottomTaperRight,
       biteUpper,
+      biteMiddle,
       biteLower,
       stem,
       leaf,
@@ -527,6 +552,60 @@ export class GameScene extends Phaser.Scene {
     this.sfx.hit(event.material === 'metal' ? 'heavy' : 'light')
   }
 
+  private powerupColor(kind: PowerupKind): number {
+    return kind === 'frenzy' ? 0xff4f8d : kind === 'freeze' ? 0x75e6ff : 0x7cff7c
+  }
+
+  private spawnPowerupRenderer(id: number, kind: PowerupKind, x: number, y: number): void {
+    if (this.powerupSprites.has(id)) return
+    const color = this.powerupColor(kind)
+    const glow = this.add.circle(0, 0, 14, color, 0.16)
+    const core = this.add.rectangle(0, 0, 13, 13, color, 0.95).setRotation(Math.PI / 4).setStrokeStyle(2, 0xffffff, 0.8)
+    const label = this.add.text(0, 18, kind === 'frenzy' ? 'CUT' : kind === 'freeze' ? 'TIME' : 'HP', {
+      fontFamily: 'monospace',
+      fontSize: '9px',
+      color: '#ffffff',
+    }).setOrigin(0.5)
+    const container = this.add.container(WORLD_CX + x, WORLD_CY + y, [glow, core, label]).setDepth(35)
+    this.powerupSprites.set(id, container)
+    this.tweens.add({ targets: core, rotation: Math.PI / 4 + Math.PI * 2, duration: 1100, repeat: -1 })
+    this.tweens.add({ targets: glow, scale: 1.35, alpha: 0.05, duration: 520, yoyo: true, repeat: -1 })
+  }
+
+  private syncPowerupRenderers(): void {
+    for (const powerup of this.state.powerups) {
+      const existing = this.powerupSprites.get(powerup.id)
+      if (!powerup.active) {
+        if (existing) { existing.destroy(true); this.powerupSprites.delete(powerup.id) }
+        continue
+      }
+      if (!existing) this.spawnPowerupRenderer(powerup.id, powerup.kind, powerup.x, powerup.y)
+      this.powerupSprites.get(powerup.id)?.setPosition(WORLD_CX + powerup.x, WORLD_CY + powerup.y)
+    }
+  }
+
+  private showComboTier(event: Extract<SimEvent, { type: 'combo-tier' }>): void {
+    const text = this.add.text(480, 112, `×${event.multiplier} CHAIN  •  CUT ${event.attackSpeed.toFixed(2)}×`, {
+      fontFamily: 'monospace', fontSize: '20px', color: '#ff77a5', backgroundColor: '#120812cc', padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setDepth(210).setScale(0.7)
+    this.tweens.add({ targets: text, scale: 1.05, alpha: 0, y: 92, duration: 720, ease: 'Back.Out', onComplete: () => text.destroy() })
+  }
+
+  private showFlowFreeze(event: Extract<SimEvent, { type: 'flow-freeze' }>): void {
+    this.flowBanner?.destroy()
+    this.flowBanner = this.add.text(480, 150, event.source === 'combo' ? 'FLOW FREEZE' : 'TIME CORE', {
+      fontFamily: 'monospace', fontSize: '28px', color: '#d9fbff', backgroundColor: '#08131bdd', padding: { x: 14, y: 8 },
+    }).setOrigin(0.5).setDepth(220)
+    this.cameras.main.flash(70, 90, 220, 255, false)
+    this.tweens.add({ targets: this.flowBanner, alpha: 0, scale: 1.22, duration: 560, ease: 'Quad.Out', onComplete: () => { this.flowBanner?.destroy(); this.flowBanner = undefined } })
+  }
+
+  private showPowerupPickup(kind: PowerupKind): void {
+    const label = kind === 'frenzy' ? 'CUT FRENZY' : kind === 'freeze' ? 'TIME FREEZE' : 'APPLE JUICE +HP'
+    const text = this.add.text(480, 190, label, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }).setOrigin(0.5).setDepth(215)
+    this.tweens.add({ targets: text, y: 172, alpha: 0, duration: 650, onComplete: () => text.destroy() })
+  }
+
   private createCrosshair(): void {
     this.aimGuide = this.add.graphics().setDepth(140)
     const graphics = this.add.graphics()
@@ -551,6 +630,8 @@ export class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(16, 14, '', style).setDepth(100)
     this.timerText = this.add.text(480, 14, '', style).setOrigin(0.5, 0).setDepth(100)
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
+    this.comboText = this.add.text(480, 38, 'CHAIN —', { ...style, fontSize: '14px', color: '#ff77a5' }).setOrigin(0.5, 0).setDepth(105)
+    this.buffText = this.add.text(480, 60, '', { ...style, fontSize: '12px', color: '#8fefff' }).setOrigin(0.5, 0).setDepth(105)
     this.inputText = this.add.text(16, 478, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
     this.add
       .text(16, 505, 'WASD MOVE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART', {
@@ -586,6 +667,10 @@ export class GameScene extends Phaser.Scene {
     this.queuedWhirlwind = false
     this.desktopInput.consumeAttacks()
     this.gore.resetTransient()
+    for (const sprite of this.powerupSprites.values()) sprite.destroy(true)
+    this.powerupSprites.clear()
+    this.flowBanner?.destroy()
+    this.flowBanner = undefined
     this.endedText?.destroy()
     this.endedText = undefined
   }
