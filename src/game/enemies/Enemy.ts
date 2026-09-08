@@ -6,6 +6,10 @@ export interface EnemyState {
   hp: number
   speed: number
   radius: number
+  mass: number
   vx: number
   vy: number
+  impulseX: number
+  impulseY: number
+  staggerTicks: number
 }
