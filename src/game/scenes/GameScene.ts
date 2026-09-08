@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { BASE_SWORD } from '../combat/Sword'
-import { GameState, activeEnemies, type InputState } from '../sim/GameState'
+import { ARENA_BOUNDS, GameState, activeEnemies, type InputState } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import { GoreFx } from '../../presentation/GoreFx'
 
@@ -102,15 +102,24 @@ export class GameScene extends Phaser.Scene {
     graphics.lineStyle(1, 0x2a1835, 0.7)
     for (let x = 0; x <= 960; x += 32) graphics.lineBetween(x, 0, x, 540)
     for (let y = 0; y <= 540; y += 32) graphics.lineBetween(0, y, 960, y)
-    graphics.lineStyle(2, 0x5a1839, 0.35)
-    graphics.strokeRect(18, 18, 924, 504)
+    graphics.lineStyle(2, 0x5a1839, 0.55)
+    graphics.strokeRect(
+      WORLD_CX - ARENA_BOUNDS.halfWidth,
+      WORLD_CY - ARENA_BOUNDS.halfHeight,
+      ARENA_BOUNDS.halfWidth * 2,
+      ARENA_BOUNDS.halfHeight * 2,
+    )
   }
 
   private createPlayer(): void {
     const body = this.add.ellipse(0, 0, 42, 28, 0xe53d35).setStrokeStyle(2, 0x250c16)
     const head = this.add.circle(16, 0, 17, 0xf24c35).setStrokeStyle(2, 0x250c16)
     const leaf = this.add.triangle(18, -18, 0, 8, 12, 0, 0, 0, 0x77d14b)
-    this.sword = this.add.rectangle(54, 0, BASE_SWORD.outerRadius, 7, 0xe7e5ef).setOrigin(0, 0.5).setStrokeStyle(2, 0x3b3345)
+    const bladeLength = BASE_SWORD.outerRadius - BASE_SWORD.innerRadius
+    this.sword = this.add
+      .rectangle(BASE_SWORD.innerRadius, 0, bladeLength, 7, 0xe7e5ef)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x3b3345)
     this.player = this.add.container(WORLD_CX, WORLD_CY, [this.sword, body, head, leaf]).setDepth(10)
   }
 
