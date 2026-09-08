@@ -44,7 +44,7 @@ describe('impact physics v0', () => {
     expect(wallSlammed).toBe(true)
   })
 
-  it('turns an actual slash into enemy-to-enemy collision damage', () => {
+  it('turns an actual slash into dense-horde enemy-to-enemy collision damage', () => {
     const state = new GameState(12)
     state.player.hp = 999
     const launched = isolateEnemy(state, 0)
@@ -54,7 +54,7 @@ describe('impact physics v0', () => {
     const target = state.enemies.items[1]
     target.active = true
     target.id = 2
-    target.x = 132
+    target.x = 118
     target.y = 0
     target.hp = 2
     target.speed = 0
@@ -72,7 +72,7 @@ describe('impact physics v0', () => {
     expect(state.events.some((event) => event.type === 'enemy-hit' && event.enemyId === targetId)).toBe(false)
 
     let collided = false
-    for (let tick = 0; tick < 12 && !collided; tick += 1) {
+    for (let tick = 0; tick < 6 && !collided; tick += 1) {
       state.step({ x: 0, y: 0, aimRadians: 0 })
       collided = state.events.some((event) => event.type === 'physics-impact' && event.kind === 'enemy')
     }
