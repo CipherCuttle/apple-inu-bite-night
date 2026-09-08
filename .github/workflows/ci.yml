@@ -26,4 +26,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bite-night-dist
+          path: dist
+          if-no-files-found: error
       - run: pnpm test:determinism
