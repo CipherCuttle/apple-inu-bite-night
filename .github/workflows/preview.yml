@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: preview-static-phase-1-combat-toy-v0
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
