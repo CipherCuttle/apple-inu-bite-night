@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ABILITY_IDS, ABILITY_REGISTRY } from '../src/game/build/Ability'
 import { HERO_REGISTRY } from '../src/game/build/Hero'
-import { DEFAULT_LOADOUT, loadoutFingerprint, validateLoadout } from '../src/game/build/Loadout'
+import { DEFAULT_LOADOUT, loadoutFingerprint, validateLoadout, type Loadout } from '../src/game/build/Loadout'
 import { createStamina } from '../src/game/build/Stamina'
 import { WEAPON_IDS, WEAPON_REGISTRY } from '../src/game/build/Weapon'
 import { SWORD_ATTACKS } from '../src/game/combat/Sword'
@@ -107,5 +107,9 @@ describe('hero / weapon / ability kernel v0', () => {
     expect(validateLoadout(DEFAULT_LOADOUT)).toEqual(DEFAULT_LOADOUT)
     expect(loadoutFingerprint(DEFAULT_LOADOUT)).toBe('apple-inu|mouthblade|zoomies|vampiric-bite')
     expect(() => validateLoadout({ ...DEFAULT_LOADOUT, skillB: 'zoomies' })).toThrow(/distinct/)
+
+    expect(() => validateLoadout({ ...DEFAULT_LOADOUT, heroId: 'forged-hero' } as unknown as Loadout)).toThrow(/Unknown hero/)
+    expect(() => validateLoadout({ ...DEFAULT_LOADOUT, weaponId: 'forged-weapon' } as unknown as Loadout)).toThrow(/Unknown weapon/)
+    expect(() => validateLoadout({ ...DEFAULT_LOADOUT, skillA: 'forged-skill' } as unknown as Loadout)).toThrow(/Unknown skill A/)
   })
 })
