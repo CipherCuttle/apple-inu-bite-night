@@ -45,6 +45,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_audio.py
           python3 ../spike/wasm/patch_wasm_menu_abi.py
           python3 ../spike/wasm/patch_wasm_init_trace.py
+          python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
           git diff --check
           git diff --stat
 
@@ -53,7 +54,7 @@ jobs:
           python3 spike/wasm/patch_menu_object_isolation.py
           bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Boot OpenRealm SDL WebGL2 in Chromium
+      - name: Boot OpenRealm SDL WebGL2 and MAP_UNIT_SMOKE in Chromium
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/openrealm-http.log 2>&1 &
@@ -73,7 +74,7 @@ jobs:
 
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
-            timeout 40s node spike/wasm/browser_smoke.mjs
+            timeout 90s node spike/wasm/browser_smoke.mjs
 
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
