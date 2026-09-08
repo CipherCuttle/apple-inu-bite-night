@@ -3,7 +3,6 @@ import type { StyleRank } from '../game/combat/StyleMeter'
 
 interface Entry {
   text: Phaser.GameObjects.Text
-  active: boolean
 }
 
 const COLORS: Record<StyleRank, string> = {
@@ -32,7 +31,7 @@ export class CombatTextFx {
         .setOrigin(0.5)
         .setDepth(40)
         .setVisible(false)
-      this.entries.push({ text, active: false })
+      this.entries.push({ text })
     }
   }
 
@@ -40,9 +39,8 @@ export class CombatTextFx {
     const entry = this.entries[this.cursor]
     this.cursor = (this.cursor + 1) % this.entries.length
     this.scene.tweens.killTweensOf(entry.text)
-    entry.active = true
     entry.text
-      .setText(`${label} +${points}${variety ? '  MIX-UP' : ''}`)
+      .setText(`${label}${points > 0 ? ` +${points}` : ''}${variety ? '  MIX-UP' : ''}`)
       .setColor(COLORS[rank])
       .setPosition(x, y)
       .setAlpha(1)
@@ -57,17 +55,13 @@ export class CombatTextFx {
       scaleY: variety ? 1.16 : 1.04,
       duration: 720,
       ease: 'Cubic.Out',
-      onComplete: () => {
-        entry.active = false
-        entry.text.setVisible(false)
-      },
+      onComplete: () => entry.text.setVisible(false),
     })
   }
 
   reset(): void {
     for (const entry of this.entries) {
       this.scene.tweens.killTweensOf(entry.text)
-      entry.active = false
       entry.text.setVisible(false)
     }
   }
