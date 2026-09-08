@@ -1,4 +1,4 @@
-export type AttackKind = 'slash' | 'stab'
+export type AttackKind = 'slash' | 'stab' | 'dash' | 'whirlwind'
 
 export interface SwordConfig {
   innerRadius: number
@@ -11,12 +11,12 @@ export interface SwordConfig {
 
 export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
   slash: {
-    innerRadius: 12,
-    outerRadius: 94,
-    arcRadians: Math.PI * 0.68,
+    innerRadius: 8,
+    outerRadius: 104,
+    arcRadians: Math.PI * 0.95,
     damage: 1,
-    knockback: 22,
-    cooldownTicks: 19,
+    knockback: 26,
+    cooldownTicks: 22,
   },
   stab: {
     innerRadius: 18,
@@ -26,9 +26,25 @@ export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
     knockback: 34,
     cooldownTicks: 28,
   },
+  dash: {
+    innerRadius: 0,
+    outerRadius: 34,
+    arcRadians: Math.PI * 0.24,
+    damage: 2,
+    knockback: 52,
+    cooldownTicks: 48,
+  },
+  whirlwind: {
+    innerRadius: 0,
+    outerRadius: 112,
+    arcRadians: Math.PI * 2,
+    damage: 1,
+    knockback: 32,
+    cooldownTicks: 78,
+  },
 }
 
-// Kept as the canonical rendered blade dimensions for the Phase-1 player rig.
+// Canonical rendered blade dimensions for the Phase-1 player rig.
 export const BASE_SWORD = SWORD_ATTACKS.slash
 
 export function swordForAttack(kind: AttackKind): SwordConfig {
