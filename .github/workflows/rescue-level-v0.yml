@@ -71,9 +71,20 @@ jobs:
           PY
           sha256sum public/assets/levels/city-block/tiles.png public/assets/levels/city-block/map.json > licenses/third_party/kenney-pico8-city/DERIVED_SHA256.txt
       - name: Apply rescue/control/level patch
-        run: python scripts/patch-rescue-level-v0.py
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/patch-rescue-level-v0.py')
+          s = p.read_text()
+          start = s.index('head_pattern =')
+          end = s.index('marker = "  private createPropRenderers(): void {\\n"')
+          p.write_text(s[:start] + s[end:])
+          PY
+          python scripts/patch-rescue-level-v0.py
+          python scripts/patch-head-only.py
       - name: Remove one-shot tooling
-        run: rm scripts/patch-rescue-level-v0.py .github/workflows/rescue-level-v0.yml
+        run: rm scripts/patch-rescue-level-v0.py scripts/patch-head-only.py .github/workflows/rescue-level-v0.yml
       - name: Verify
         run: |
           pnpm install --frozen-lockfile
