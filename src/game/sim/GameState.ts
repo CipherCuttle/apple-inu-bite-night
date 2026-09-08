@@ -255,7 +255,7 @@ export class GameState {
 
   isDodging(): boolean { return this.dodgeState !== null }
   dodgeTicksRemaining(): number { return this.dodgeState ? Math.max(0, this.dodgeState.totalTicks - this.dodgeState.elapsedTicks) : 0 }
-  dodgeInvulnerable(): boolean { return this.dodgeState ? dodgeIsInvulnerable(this.dodgeState, this.hero.dodgeProfile) : false }
+  dodgeInvulnerable(): boolean { return this.dodgeState?.invulnerableThisTick ?? false }
   staminaCurrent(): number { return this.stamina.current }
   staminaMax(): number { return this.stamina.max }
   staminaProgress(): number { return staminaRatio(this.stamina) }
@@ -324,6 +324,7 @@ export class GameState {
       feed(this.dodgeState.stepX)
       feed(this.dodgeState.stepY)
       feed(this.dodgeState.blocked ? 1 : 0)
+      feed(this.dodgeState.invulnerableThisTick ? 1 : 0)
     } else {
       feed(0)
     }
@@ -407,6 +408,7 @@ export class GameState {
       }
     }
     const invulnerable = dodgeIsInvulnerable(dodge, this.hero.dodgeProfile)
+    dodge.invulnerableThisTick = invulnerable
     this.events.push({ type: 'dodge-step', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing, invulnerable })
     dodge.elapsedTicks += 1
     if (dodge.elapsedTicks >= dodge.totalTicks) {
