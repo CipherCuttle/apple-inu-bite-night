@@ -1,7 +1,9 @@
 import { isPointInSwordArc, normalizeAngle, swordForAttack, type AttackKind } from '../combat/Sword'
+import { StyleMeter, type StyleRank } from '../combat/StyleMeter'
 import { EnemyPool } from '../enemies/EnemyPool'
 import type { EnemyState } from '../enemies/Enemy'
 import { createImpactProps, type PropMaterial, type PropState } from '../world/Props'
+import { MAZE_EXIT, MAZE_KILL_GATE, MAZE_START, buildMazeFlowField, mazeCanOccupy, mazeExitReached, mazeFlowTarget, openMazeCenters } from '../world/Maze'
 import { XorShift32 } from './RNG'
 
 export type PowerupKind = 'last-bite'
@@ -83,6 +85,11 @@ export type SimEvent =
     }
   | { type: 'player-hit'; tick: number; hp: number }
   | { type: 'combo-tier'; tick: number; comboKills: number; multiplier: number; attackSpeed: number }
+  | { type: 'style-award'; tick: number; x: number; y: number; label: string; points: number; total: number; rank: StyleRank; variety: boolean }
+  | { type: 'style-rank'; tick: number; rank: StyleRank; label: string; total: number }
+  | { type: 'style-break'; tick: number; x: number; y: number; total: number; rank: StyleRank }
+  | { type: 'maze-exit-unlocked'; tick: number; kills: number }
+  | { type: 'maze-cleared'; tick: number; kills: number; score: number }
   | { type: 'bullet-time'; tick: number; durationTicks: number }
   | { type: 'last-chance'; tick: number; powerupId: number; x: number; y: number }
   | { type: 'powerup-drop'; tick: number; powerupId: number; kind: PowerupKind; x: number; y: number }
@@ -102,7 +109,7 @@ interface DashState {
 
 const PLAYER_SPEED = 3.25
 const PLAYER_RADIUS = 14
-export const TARGET_ENEMIES = 48
+export const TARGET_ENEMIES = 20
 const DASH_MIN_DISTANCE = 48
 const DASH_MAX_BONUS_DISTANCE = 150
 const DASH_HIT_RADIUS = 24
@@ -133,12 +140,15 @@ export const ARENA_BOUNDS = {
   halfHeight: 235,
 } as const
 
+const MAZE_SPAWN_POINTS = openMazeCenters()
+
 export class GameState {
   readonly seed: number
   readonly rng: XorShift32
   readonly enemies = new EnemyPool(220)
   readonly props: PropState[] = createImpactProps()
-  readonly player: PlayerState = { x: 0, y: 0, facing: 0, hp: PLAYER_MAX_HP, invulnerableTicks: 0 }
+  readonly style = new StyleMeter()
+  readonly player: PlayerState = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: PLAYER_MAX_HP, invulnerableTicks: 0 }
   readonly events: SimEvent[] = []
   readonly powerups: PowerupState[] = []
   tick = 0
@@ -146,6 +156,7 @@ export class GameState {
   score = 0
   comboKills = 0
   ended = false
+  mazeWon = false
   private comboTicksRemaining = 0
   private bulletTimeTicks = 0
   private lastBiteFrenzyTicks = 0
@@ -166,6 +177,8 @@ export class GameState {
     this.events.length = 0
     this.tick += 1
 
+    const decayedRank = this.style.tick()
+    if (decayedRank) this.events.push({ type: 'style-rank', tick: this.tick, rank: decayedRank, label: this.style.label(), total: this.style.points })
     this.updateComboAndBuffTimers()
     this.updateDashCharge(input)
     this.updatePlayer(input)
@@ -186,6 +199,13 @@ export class GameState {
 
     this.updatePowerups()
     if (worldStepsThisTick) this.resolveEnemyContact()
+    if (!this.ended && this.kills >= MAZE_KILL_GATE && mazeExitReached(this.player.x, this.player.y)) {
+      this.mazeWon = true
+      this.ended = true
+      this.score += 5000
+      this.events.push({ type: 'maze-cleared', tick: this.tick, kills: this.kills, score: this.score })
+      return
+    }
     this.ensurePopulation()
 
     if (this.bulletTimeTicks > 0) this.bulletTimeTicks -= 1
@@ -209,16 +229,18 @@ export class GameState {
     return this.dashState?.remainingTicks ?? 0
   }
 
-  comboMultiplier(): number {
-    if (this.comboKills >= 12) return 4
-    if (this.comboKills >= 8) return 3
-    if (this.comboKills >= 4) return 2
-    return 1
-  }
+  comboMultiplier(): number { return this.style.scoreMultiplier() }
+  styleRank(): StyleRank { return this.style.rank() }
+  styleLabel(): string { return this.style.label() }
+  stylePoints(): number { return this.style.points }
+  styleProgress(): number { return this.style.meterProgress() }
+  styleScoreMultiplier(): number { return this.style.scoreMultiplier() }
+  mazeExitUnlocked(): boolean { return this.kills >= MAZE_KILL_GATE }
+  mazeKillsRemaining(): number { return Math.max(0, MAZE_KILL_GATE - this.kills) }
+  mazeExit(): { x: number; y: number } { return MAZE_EXIT }
 
   attackSpeedMultiplier(): number {
-    const comboBoost = this.comboKills >= 12 ? 1.12 : this.comboKills >= 8 ? 1.08 : this.comboKills >= 4 ? 1.04 : 1
-    return comboBoost * (this.lastBiteFrenzyTicks > 0 ? LAST_BITE_ATTACK_SPEED : 1)
+    return this.lastBiteFrenzyTicks > 0 ? LAST_BITE_ATTACK_SPEED : 1
   }
 
   comboTimeRemaining(): number {
@@ -245,6 +267,8 @@ export class GameState {
     feed(this.bulletTimeTicks)
     feed(this.lastBiteFrenzyTicks)
     feed(this.lastChanceUsed ? 1 : 0)
+    feed(this.mazeWon ? 1 : 0)
+    for (const value of this.style.snapshot()) feed(value)
     feed(this.nextPowerupId)
     feed(this.player.x)
     feed(this.player.y)
@@ -332,21 +356,25 @@ export class GameState {
     const nx = input.x / Math.max(1, length)
     const ny = input.y / Math.max(1, length)
     const chargeSlowdown = input.dashHeld ? 0.55 : 1
-    const flowMoveBoost = this.comboMultiplier() >= 3 ? 1.03 : 1
-    const speed = PLAYER_SPEED * chargeSlowdown * flowMoveBoost
+    const speed = PLAYER_SPEED * chargeSlowdown
     const nextX = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-    if (!this.playerOverlapsProp(nextX, this.player.y)) this.player.x = nextX
+    if (!this.playerOverlapsProp(nextX, this.player.y) && mazeCanOccupy(nextX, this.player.y, PLAYER_RADIUS)) this.player.x = nextX
     const nextY = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
-    if (!this.playerOverlapsProp(this.player.x, nextY)) this.player.y = nextY
+    if (!this.playerOverlapsProp(this.player.x, nextY) && mazeCanOccupy(this.player.x, nextY, PLAYER_RADIUS)) this.player.y = nextY
   }
 
   private updateEnemies(): void {
+    const flow = buildMazeFlowField(this.player.x, this.player.y)
     for (const enemy of this.enemies.items) {
       if (!enemy.active) continue
       if (enemy.staggerTicks > 0) enemy.staggerTicks -= 1
 
-      const dx = this.player.x - enemy.x
-      const dy = this.player.y - enemy.y
+      const directDx = this.player.x - enemy.x
+      const directDy = this.player.y - enemy.y
+      const directDist = Math.hypot(directDx, directDy) || 1
+      const flowTarget = directDist < 42 ? { x: this.player.x, y: this.player.y } : mazeFlowTarget(enemy.x, enemy.y, flow)
+      const dx = flowTarget.x - enemy.x
+      const dy = flowTarget.y - enemy.y
       const dist = Math.hypot(dx, dy) || 1
       const chaseScale = enemy.staggerTicks > 0 ? 0.12 : 1
       const chaseX = (dx / dist) * enemy.speed * chaseScale
@@ -354,8 +382,21 @@ export class GameState {
 
       enemy.vx = chaseX + enemy.impulseX
       enemy.vy = chaseY + enemy.impulseY
-      enemy.x += enemy.vx
-      enemy.y += enemy.vy
+      const nextX = enemy.x + enemy.vx
+      if (mazeCanOccupy(nextX, enemy.y, enemy.radius)) enemy.x = nextX
+      else {
+        const wallForce = Math.abs(enemy.impulseX)
+        if (wallForce >= WALL_SLAM_THRESHOLD) this.damageEnemyFromPhysics(enemy, wallForce, 'wall', enemy.x, enemy.y)
+        enemy.impulseX *= -0.2
+      }
+      if (!enemy.active) continue
+      const nextY = enemy.y + enemy.vy
+      if (mazeCanOccupy(enemy.x, nextY, enemy.radius)) enemy.y = nextY
+      else {
+        const wallForce = Math.abs(enemy.impulseY)
+        if (wallForce >= WALL_SLAM_THRESHOLD) this.damageEnemyFromPhysics(enemy, wallForce, 'wall', enemy.x, enemy.y)
+        enemy.impulseY *= -0.2
+      }
 
       this.resolveEnemyArenaWall(enemy)
       if (!enemy.active) continue
@@ -560,6 +601,7 @@ export class GameState {
     let endX = clamp(startX + dash.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
     let endY = clamp(startY + dash.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
     let blocked = false
+    if (!mazeCanOccupy(endX, endY, PLAYER_RADIUS)) { blocked = true; endX = startX; endY = startY }
     const dashForce = 12 + dash.power * 22
 
     for (const prop of this.props) {
@@ -614,9 +656,13 @@ export class GameState {
     }
 
     if (killed) {
+      const styleBase = attack === 'dash' ? 80 : attack === 'stab' ? 65 : attack === 'whirlwind' ? 58 : 48
+      const styleLabel = attack === 'dash' ? 'RIP THROUGH' : attack === 'stab' ? 'SKEWER' : attack === 'whirlwind' ? 'BLENDER' : 'CLEAVE'
+      this.awardStyle(styleBase, styleLabel, hitX, hitY, attack)
       this.registerKill(hitX, hitY)
       this.enemies.kill(enemy)
     } else {
+      if (severedPart) this.awardStyle(32, 'DISMEMBER', hitX, hitY)
       const impulse = (knockback * IMPULSE_SCALE) / Math.max(0.6, enemy.mass)
       enemy.impulseX += Math.cos(facing) * impulse
       enemy.impulseY += Math.sin(facing) * impulse
@@ -649,6 +695,9 @@ export class GameState {
     enemy.hp -= 1
     const killed = enemy.hp <= 0
     if (killed) {
+      const styleBase = kind === 'enemy' ? 105 : kind === 'wall' ? 95 : 80
+      const styleLabel = kind === 'enemy' ? 'BODY CHECK' : kind === 'wall' ? 'WALL SLAM' : 'CRUSH'
+      this.awardStyle(styleBase, styleLabel, x, y)
       this.registerKill(x, y)
       this.enemies.kill(enemy)
     } else {
@@ -680,23 +729,17 @@ export class GameState {
   }
 
   private registerKill(_x: number, _y: number): void {
-    const previousMultiplier = this.comboMultiplier()
     this.kills += 1
     this.comboKills += 1
     this.comboTicksRemaining = COMBO_WINDOW_TICKS
-    const multiplier = this.comboMultiplier()
-    this.score += 100 * multiplier
+    this.score += Math.round(100 * this.style.scoreMultiplier())
+    if (this.kills === MAZE_KILL_GATE) this.events.push({ type: 'maze-exit-unlocked', tick: this.tick, kills: this.kills })
+  }
 
-    if (multiplier !== previousMultiplier) {
-      this.events.push({
-        type: 'combo-tier',
-        tick: this.tick,
-        comboKills: this.comboKills,
-        multiplier,
-        attackSpeed: this.attackSpeedMultiplier(),
-      })
-    }
-
+  private awardStyle(base: number, label: string, x: number, y: number, attack?: AttackKind): void {
+    const result = this.style.award(base, attack)
+    this.events.push({ type: 'style-award', tick: this.tick, x, y, label, points: result.gained, total: result.total, rank: result.rank, variety: result.variety })
+    if (result.rankChanged) this.events.push({ type: 'style-rank', tick: this.tick, rank: result.rank, label: this.style.label(), total: result.total })
   }
 
   private triggerLastChance(): void {
@@ -707,6 +750,7 @@ export class GameState {
     const angle = normalizeAngle(this.player.facing + Math.PI * 0.5)
     let x = clamp(this.player.x + Math.cos(angle) * 54, -ARENA_BOUNDS.halfWidth + 24, ARENA_BOUNDS.halfWidth - 24)
     let y = clamp(this.player.y + Math.sin(angle) * 54, -ARENA_BOUNDS.halfHeight + 24, ARENA_BOUNDS.halfHeight - 24)
+    if (!mazeCanOccupy(x, y, 10)) { x = this.player.x; y = this.player.y }
     const powerup: PowerupState = { id: this.nextPowerupId++, kind: 'last-bite', x, y, active: true, ttlTicks: LAST_BITE_TTL_TICKS }
     this.powerups.push(powerup)
     this.events.push({ type: 'last-chance', tick: this.tick, powerupId: powerup.id, x, y })
@@ -769,7 +813,10 @@ export class GameState {
 
       this.player.hp -= 1
       this.player.invulnerableTicks = 45
+      const styleRankDrop = this.style.onPlayerHit()
       this.events.push({ type: 'player-hit', tick: this.tick, hp: this.player.hp })
+      this.events.push({ type: 'style-break', tick: this.tick, x: this.player.x, y: this.player.y, total: this.style.points, rank: this.style.rank() })
+      if (styleRankDrop) this.events.push({ type: 'style-rank', tick: this.tick, rank: styleRankDrop, label: this.style.label(), total: this.style.points })
       this.triggerLastChance()
       return
     }
@@ -779,6 +826,12 @@ export class GameState {
     while (this.enemies.activeCount() < TARGET_ENEMIES) {
       const enemy = this.enemies.spawnAround(this.player.x, this.player.y, this.rng)
       if (!enemy) break
+      const candidates = MAZE_SPAWN_POINTS.filter((point) => Math.hypot(point.x - this.player.x, point.y - this.player.y) >= 150)
+      const pool = candidates.length > 0 ? candidates : MAZE_SPAWN_POINTS
+      const point = pool[this.rng.int(0, pool.length - 1)]
+      enemy.x = point.x + this.rng.range(-9, 9)
+      enemy.y = point.y + this.rng.range(-9, 9)
+      if (!mazeCanOccupy(enemy.x, enemy.y, enemy.radius)) { enemy.x = point.x; enemy.y = point.y }
     }
   }
 }

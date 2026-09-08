@@ -5,9 +5,12 @@ import { KeyboardCombatBuffer } from '../input/KeyboardCombatBuffer'
 import { ARENA_BOUNDS, GameState, type InputState, type PowerupKind, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import type { PropMaterial } from '../world/Props'
+import { MAZE_CELL_SIZE, MAZE_EXIT, MAZE_GRID, MAZE_KILL_GATE, MAZE_ORIGIN_X, MAZE_ORIGIN_Y, MAZE_START, mazeWallCells, cellCenter } from '../world/Maze'
+import type { StyleRank } from '../combat/StyleMeter'
 import { GoreFx } from '../../presentation/GoreFx'
 import { getImpactProfile } from '../../presentation/CombatFeel'
 import { Sfx } from '../../presentation/Sfx'
+import { CombatTextFx } from '../../presentation/CombatTextFx'
 
 const WORLD_CX = 480
 const WORLD_CY = 270
@@ -34,6 +37,12 @@ export class GameScene extends Phaser.Scene {
   private killText!: Phaser.GameObjects.Text
   private comboText!: Phaser.GameObjects.Text
   private buffText!: Phaser.GameObjects.Text
+  private styleRankText!: Phaser.GameObjects.Text
+  private styleLabelText!: Phaser.GameObjects.Text
+  private styleMeterGraphics!: Phaser.GameObjects.Graphics
+  private mazeStatusText!: Phaser.GameObjects.Text
+  private mazeExitCore!: Phaser.GameObjects.Rectangle
+  private mazeExitLabel!: Phaser.GameObjects.Text
   private flowBanner?: Phaser.GameObjects.Text
   private readonly keyboardCombat = new KeyboardCombatBuffer()
   private powerupSprites = new Map<number, Phaser.GameObjects.Container>()
@@ -45,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private whirlwindKey!: Phaser.Input.Keyboard.Key
   private desktopInput!: DesktopCombatInput
   private gore!: GoreFx
+  private combatText!: CombatTextFx
   private endedText?: Phaser.GameObjects.Text
   private hitStopMs = 0
 
@@ -69,8 +79,10 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.createArena()
+    this.createMazeLevel()
     this.createPropRenderers()
     this.gore = new GoreFx(this)
+    this.combatText = new CombatTextFx(this)
     this.createPlayer()
     this.createEnemyRenderPool()
     this.createCrosshair()
@@ -173,6 +185,11 @@ export class GameScene extends Phaser.Scene {
         else this.cameras.main.shake(35, Math.min(0.0028, 0.0008 + event.force * 0.00008))
       }
       if (event.type === 'combo-tier') this.showComboTier(event)
+      if (event.type === 'style-award') this.combatText.show(WORLD_CX + event.x, WORLD_CY + event.y - 18, event.label, event.points, event.rank, event.variety)
+      if (event.type === 'style-rank') this.showStyleRank(event)
+      if (event.type === 'style-break') this.combatText.show(WORLD_CX + event.x, WORLD_CY + event.y - 28, 'STYLE BROKEN', 0, event.rank)
+      if (event.type === 'maze-exit-unlocked') this.showMazeExitUnlocked()
+      if (event.type === 'maze-cleared') this.showMazeCleared(event)
       if (event.type === 'bullet-time') this.showBulletTime(event)
       if (event.type === 'powerup-drop') this.spawnPowerupRenderer(event.powerupId, event.kind, event.x, event.y)
       if (event.type === 'powerup-picked') this.showPowerupPickup(event.kind)
@@ -189,11 +206,18 @@ export class GameScene extends Phaser.Scene {
     this.player.setRotation(this.state.player.facing)
     this.player.setAlpha(this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3 ? 0.42 : 1)
     this.hpText.setText(`HP ${'■'.repeat(Math.max(0, this.state.player.hp))}`)
-    this.timerText.setText(`SURVIVE ${(this.state.tick / 60).toFixed(1)}s`)
+    this.timerText.setText(`MAZE ${(this.state.tick / 60).toFixed(1)}s`)
     this.killText.setText(`KILLS ${this.state.kills}  •  SCORE ${this.state.score}`)
-    const multiplier = this.state.comboMultiplier()
     const comboWindow = this.state.comboTimeRemaining()
-    this.comboText.setText(this.state.comboKills > 0 ? `CHAIN ${this.state.comboKills}  ×${multiplier}  CUT ${this.state.attackSpeedMultiplier().toFixed(2)}×  ${Math.ceil(comboWindow / 60)}s` : 'CHAIN —')
+    this.comboText.setText(this.state.comboKills > 0 ? `CHAIN ${this.state.comboKills}  •  ${Math.ceil(comboWindow / 60)}s` : 'CHAIN —')
+    this.styleRankText.setText(this.state.styleRank()).setColor(styleColor(this.state.styleRank()))
+    this.styleLabelText.setText(`${this.state.styleLabel()}  ×${this.state.styleScoreMultiplier().toFixed(2)}`)
+    this.mazeStatusText.setText(this.state.mazeExitUnlocked() ? 'EXIT OPEN // RUN' : `SEAL ${MAZE_KILL_GATE - this.state.mazeKillsRemaining()}/${MAZE_KILL_GATE}`)
+    this.mazeExitCore.setFillStyle(this.state.mazeExitUnlocked() ? 0x7cff9b : 0x7a204e, this.state.mazeExitUnlocked() ? 0.72 : 0.38)
+    this.mazeExitLabel.setText(this.state.mazeExitUnlocked() ? 'EXIT' : `${this.state.mazeKillsRemaining()} KILLS`)
+    this.styleMeterGraphics.clear()
+    this.styleMeterGraphics.fillStyle(0x17131c, 0.9).fillRect(850, 148, 82, 7)
+    this.styleMeterGraphics.fillStyle(styleColorNumber(this.state.styleRank()), 0.95).fillRect(850, 148, 82 * this.state.styleProgress(), 7)
     const buffs: string[] = []
     if (this.state.bulletTimeTicksRemaining() > 0) buffs.push(`LAST CHANCE ${(this.state.bulletTimeTicksRemaining() / 60).toFixed(1)}s`)
     if (this.state.frenzyTicksRemaining() > 0) buffs.push(`FRENZY ${(this.state.frenzyTicksRemaining() / 60).toFixed(1)}s`)
@@ -301,6 +325,36 @@ export class GameScene extends Phaser.Scene {
       ARENA_BOUNDS.halfWidth * 2,
       ARENA_BOUNDS.halfHeight * 2,
     )
+  }
+
+  private createMazeLevel(): void {
+    const graphics = this.add.graphics().setDepth(1)
+    for (let row = 0; row < MAZE_GRID.length; row += 1) {
+      for (let col = 0; col < MAZE_GRID[row].length; col += 1) {
+        const x = WORLD_CX + MAZE_ORIGIN_X + col * MAZE_CELL_SIZE
+        const y = WORLD_CY + MAZE_ORIGIN_Y + row * MAZE_CELL_SIZE
+        if (MAZE_GRID[row][col] === '#') {
+          graphics.fillStyle(0x0b0810, 0.96).fillRect(x, y, MAZE_CELL_SIZE, MAZE_CELL_SIZE)
+          graphics.lineStyle(2, 0x3b263f, 0.72).strokeRect(x + 1, y + 1, MAZE_CELL_SIZE - 2, MAZE_CELL_SIZE - 2)
+          graphics.lineStyle(1, 0x6e4267, 0.18).lineBetween(x + 7, y + 9, x + MAZE_CELL_SIZE - 8, y + 9)
+        } else {
+          graphics.fillStyle((row + col) % 2 === 0 ? 0x18121d : 0x151019, 0.7).fillRect(x, y, MAZE_CELL_SIZE, MAZE_CELL_SIZE)
+        }
+      }
+    }
+
+    const startX = WORLD_CX + MAZE_START.x
+    const startY = WORLD_CY + MAZE_START.y
+    const boneGlow = this.add.circle(startX, startY, 18, 0xff9d57, 0.12).setDepth(2)
+    const boneCore = this.add.circle(startX, startY, 7, 0xffc46b, 0.7).setDepth(2)
+    this.add.text(startX, startY + 24, 'BONEFIRE', { fontFamily: 'monospace', fontSize: '9px', color: '#d7b690' }).setOrigin(0.5).setDepth(3)
+    this.tweens.add({ targets: boneGlow, scale: 1.35, alpha: 0.04, duration: 700, yoyo: true, repeat: -1 })
+    this.tweens.add({ targets: boneCore, alpha: 0.35, duration: 420, yoyo: true, repeat: -1 })
+
+    const exitX = WORLD_CX + MAZE_EXIT.x
+    const exitY = WORLD_CY + MAZE_EXIT.y
+    this.mazeExitCore = this.add.rectangle(exitX, exitY, 30, 30, 0x7a204e, 0.38).setRotation(Math.PI / 4).setStrokeStyle(2, 0xd8c8dc, 0.55).setDepth(3)
+    this.mazeExitLabel = this.add.text(exitX, exitY + 27, '', { fontFamily: 'monospace', fontSize: '9px', color: '#f1e6f5' }).setOrigin(0.5).setDepth(4)
   }
 
   private createPropRenderers(): void {
@@ -562,6 +616,24 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: text, scale: 1.05, alpha: 0, y: 92, duration: 720, ease: 'Back.Out', onComplete: () => text.destroy() })
   }
 
+  private showStyleRank(event: Extract<SimEvent, { type: 'style-rank' }>): void {
+    this.styleRankText.setText(event.rank).setColor(styleColor(event.rank)).setScale(0.72)
+    this.styleLabelText.setText(event.label)
+    this.tweens.killTweensOf(this.styleRankText)
+    this.tweens.add({ targets: this.styleRankText, scale: 1.08, duration: 120, yoyo: true, ease: 'Back.Out' })
+  }
+
+  private showMazeExitUnlocked(): void {
+    const text = this.add.text(480, 132, 'SEAL BROKEN // EXIT OPEN', { fontFamily: 'monospace', fontSize: '20px', color: '#9dffb4', backgroundColor: '#07120bdd', padding: { x: 12, y: 6 } }).setOrigin(0.5).setDepth(220)
+    this.cameras.main.flash(60, 110, 255, 155, false)
+    this.tweens.add({ targets: text, y: 112, alpha: 0, duration: 900, ease: 'Cubic.Out', onComplete: () => text.destroy() })
+  }
+
+  private showMazeCleared(event: Extract<SimEvent, { type: 'maze-cleared' }>): void {
+    if (this.endedText) return
+    this.endedText = this.add.text(480, 270, `MAZE CLEARED\nSTYLE ${this.state.styleRank()} // ${this.state.styleLabel()}\n${event.kills} kills • ${event.score} score\n\nR TO RUN AGAIN`, { fontFamily: 'monospace', fontSize: '25px', align: 'center', color: '#effff2', backgroundColor: '#08140ddd', padding: { x: 24, y: 18 } }).setOrigin(0.5).setDepth(230)
+  }
+
   private showBulletTime(_event: Extract<SimEvent, { type: 'bullet-time' }>): void {
     this.flowBanner?.destroy()
     this.flowBanner = this.add.text(480, 150, 'LAST CHANCE // BULLET TIME', {
@@ -603,6 +675,10 @@ export class GameScene extends Phaser.Scene {
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
     this.comboText = this.add.text(480, 38, 'CHAIN —', { ...style, fontSize: '14px', color: '#ff77a5' }).setOrigin(0.5, 0).setDepth(105)
     this.buffText = this.add.text(480, 60, '', { ...style, fontSize: '12px', color: '#8fefff' }).setOrigin(0.5, 0).setDepth(105)
+    this.styleRankText = this.add.text(890, 66, 'D', { ...style, fontSize: '58px', fontStyle: 'bold', color: '#b8b4c3', stroke: '#09070d', strokeThickness: 7 }).setOrigin(0.5, 0).setDepth(130)
+    this.styleLabelText = this.add.text(890, 126, 'STRAY ×1.00', { ...style, fontSize: '11px', color: '#d8d2c8' }).setOrigin(0.5, 0).setDepth(130)
+    this.styleMeterGraphics = this.add.graphics().setDepth(129)
+    this.mazeStatusText = this.add.text(480, 82, '', { ...style, fontSize: '11px', color: '#d6b8d7' }).setOrigin(0.5, 0).setDepth(105)
     this.inputText = this.add.text(16, 478, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
     this.add
       .text(16, 505, 'WASD MOVE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART', {
@@ -617,7 +693,7 @@ export class GameScene extends Phaser.Scene {
   private showRunEnded(): void {
     if (this.endedText) return
     this.endedText = this.add
-      .text(480, 270, `DOG DOWN\n${(this.state.tick / 60).toFixed(1)}s • ${this.state.kills} kills\n\nR TO RETRY`, {
+      .text(480, 270, `YOU DIED // BONEFIRE\n${(this.state.tick / 60).toFixed(1)}s • ${this.state.kills} kills • STYLE ${this.state.styleRank()}\n\nR TO RETURN`, {
         fontFamily: 'monospace',
         fontSize: '28px',
         align: 'center',
@@ -635,6 +711,7 @@ export class GameScene extends Phaser.Scene {
     this.keyboardCombat.clear()
     this.desktopInput.clearAttackBuffers()
     this.gore.resetTransient()
+    this.combatText.reset()
     for (const sprite of this.powerupSprites.values()) sprite.destroy(true)
     this.powerupSprites.clear()
     this.flowBanner?.destroy()
@@ -642,4 +719,12 @@ export class GameScene extends Phaser.Scene {
     this.endedText?.destroy()
     this.endedText = undefined
   }
+}
+
+function styleColor(rank: StyleRank): string {
+  return rank === 'SS' ? '#ff4f8d' : rank === 'S' ? '#ff7aa8' : rank === 'A' ? '#ffd166' : rank === 'B' ? '#a8e66b' : rank === 'C' ? '#d8d2c8' : '#b8b4c3'
+}
+
+function styleColorNumber(rank: StyleRank): number {
+  return rank === 'SS' ? 0xff4f8d : rank === 'S' ? 0xff7aa8 : rank === 'A' ? 0xffd166 : rank === 'B' ? 0xa8e66b : rank === 'C' ? 0xd8d2c8 : 0xb8b4c3
 }
