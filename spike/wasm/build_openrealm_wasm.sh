@@ -23,7 +23,6 @@ build-wasm/img2sysfont renderer/conchars.pcx renderer/conchars_sysfont.h conchar
 python3 - <<'PY'
 from pathlib import Path
 
-root = Path('.')
 out = Path('build-wasm')
 
 def sources(*dirs, exclude=()):
@@ -72,10 +71,18 @@ COMMON_FLAGS=(
   -DBZ_MSAA_SAMPLES=0
 )
 
+# Emscripten ports must be enabled while compiling translation units as well as
+# during final link; otherwise their sysroot headers (notably SDL2/SDL.h) are
+# intentionally unavailable.
+PORT_FLAGS=(
+  -sUSE_SDL=2
+  -sUSE_ZLIB=1
+)
+
 compile_unity() {
   local name="$1"; shift
   echo "[wasm:$name]"
-  emcc "${COMMON_FLAGS[@]}" "$@" -c "build-wasm/unity_${name}.c" -o "build-wasm/obj/${name}.o"
+  emcc "${COMMON_FLAGS[@]}" "${PORT_FLAGS[@]}" "$@" -c "build-wasm/unity_${name}.c" -o "build-wasm/obj/${name}.o"
 }
 
 compile_unity shared
@@ -131,8 +138,7 @@ emcc \
   build-wasm/obj/game.o \
   build-wasm/obj/menu.o \
   -o build-wasm/openrealm.html \
-  -sUSE_SDL=2 \
-  -sUSE_ZLIB=1 \
+  "${PORT_FLAGS[@]}" \
   -sFULL_ES3=1 \
   -sMIN_WEBGL_VERSION=2 \
   -sMAX_WEBGL_VERSION=2 \
