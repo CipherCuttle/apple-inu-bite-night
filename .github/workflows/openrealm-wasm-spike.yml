@@ -47,6 +47,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_init_trace.py
           python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
           python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
+          python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
           git diff --check
           git diff --stat
 
@@ -73,7 +74,7 @@ jobs:
           fi
           echo "Using $chrome"
 
-          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 pngjs@7.0.0
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 90s node spike/wasm/browser_smoke.mjs
 
