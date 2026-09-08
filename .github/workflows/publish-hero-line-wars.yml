@@ -49,6 +49,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
           python3 ../spike/wasm/patch_wasm_selection_ring.py
           python3 ../spike/wasm/patch_hero_line_wars.py
+          python3 ../spike/wasm/patch_hlw_rect_fix.py
           git diff --check
 
       - name: Build playable wasm
