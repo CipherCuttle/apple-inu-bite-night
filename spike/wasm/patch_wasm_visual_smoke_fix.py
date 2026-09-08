@@ -72,6 +72,16 @@ replace(
     '''    CL_AddBuilding();\n    CL_AddCursorSplat();\n#ifdef __EMSCRIPTEN__\n    CL_AddWasmSmokeSplats();\n#endif\n\n    cl.viewDef.num_entities = view_state.num_entities;\n''',
 )
 
+# Splat projection normally relies on terrain/depth. The asset-free smoke has no
+# retail terrain archive, so add a deterministic diagnostic presentation through
+# the renderer's ordinary 2D DrawFill API after the real 3D frame. The marker's
+# screen position is still driven by the real authoritative unit snapshot.
+replace(
+    "client/cl_view.c",
+    '''    re.RenderFrame(&cl.viewDef);\n    CL_DrawTEnts();\n''',
+    '''    re.RenderFrame(&cl.viewDef);\n#ifdef __EMSCRIPTEN__\n    if (!strcmp(cl.configstrings[CS_WORLD], "__wasm_smoke__")) {\n        size2_t const window = re.GetWindowSize();\n        FLOAT const board_w = window.width * 0.72f;\n        FLOAT const board_h = window.height * 0.54f;\n        FLOAT const board_x = (window.width - board_w) * 0.5f;\n        FLOAT const board_y = (window.height - board_h) * 0.42f;\n        FLOAT const cell_w = board_w / 12.0f;\n        FLOAT const cell_h = board_h / 8.0f;\n        RECT border = { board_x - 8.0f, board_y - 8.0f, board_w + 16.0f, board_h + 16.0f };\n        re.DrawFill(&border, (COLOR32){ 155, 70, 215, 255 });\n        for (int y = 0; y < 8; y++) {\n            for (int x = 0; x < 12; x++) {\n                RECT cell = {\n                    board_x + x * cell_w + 1.0f,\n                    board_y + y * cell_h + 1.0f,\n                    cell_w - 2.0f,\n                    cell_h - 2.0f\n                };\n                COLOR32 color = ((x + y) & 1)\n                    ? (COLOR32){ 74, 30, 108, 255 }\n                    : (COLOR32){ 36, 18, 54, 255 };\n                re.DrawFill(&cell, color);\n            }\n        }\n        FOR_LOOP(i, cl.num_active) {\n            DWORD const number = cl.active_entities[i];\n            entityState_t const *state;\n            FLOAT t;\n            RECT marker;\n            if (!number || number >= MAX_CLIENT_ENTITIES) continue;\n            state = &cl.ents[number].current;\n            if (state->class_id != MAKEFOURCC('o', 'p', 'e', 'o')) continue;\n            t = (state->origin.x + 140.0f) / 280.0f;\n            t = MAX(0.0f, MIN(1.0f, t));\n            marker = (RECT){\n                board_x + t * board_w - 12.0f,\n                board_y + board_h * 0.5f - 12.0f,\n                24.0f, 24.0f\n            };\n            re.DrawFill(&marker, (COLOR32){ 255, 76, 220, 255 });\n            break;\n        }\n        re.DrawString((int)board_x, (int)(board_y - 28.0f), "OPENREALM / TOWER WARS ENGINE SMOKE");\n        {\n            static BOOL wasm_screen_board_reported = false;\n            if (!wasm_screen_board_reported) {\n                fprintf(stderr, "OPENREALM_MAP_SCREEN_BOARD=PASS %.0fx%.0f\\n", board_w, board_h);\n                wasm_screen_board_reported = true;\n            }\n        }\n    }\n#endif\n    CL_DrawTEnts();\n''',
+)
+
 # Strengthen gate 5: renderer-list admission is not enough. Emit smoke evidence
 # only from the actual entity draw loop, after visibility/model checks have
 # passed and immediately before R_DrawEntity executes.
