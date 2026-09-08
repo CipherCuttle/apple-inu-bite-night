@@ -1,0 +1,55 @@
+name: openrealm-wasm-spike
+
+on:
+  push:
+    branches: [pivot/openrealm-wasm-spike-v0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-spike:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v10
+        with:
+          version: latest
+          actions-cache-folder: emsdk-cache
+
+      - name: Record toolchain
+        run: |
+          emcc --version
+          node --version
+          python3 --version
+
+      - name: Clone pinned OpenRealm
+        run: |
+          git clone https://github.com/corepunch/open-realm.git open-realm
+          git -C open-realm checkout cf12357883950c14abce8d636596952c3fc547bb
+          test "$(git -C open-realm rev-parse HEAD)" = "cf12357883950c14abce8d636596952c3fc547bb"
+
+      - name: Apply browser overlay
+        run: |
+          cd open-realm
+          python3 ../spike/wasm/patch_openrealm.py
+          git diff --check
+          git diff --stat
+
+      - name: Compile and link actual OpenRealm engine
+        run: bash spike/wasm/build_openrealm_wasm.sh open-realm
+
+      - name: Upload wasm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrealm-wasm-spike
+          path: |
+            open-realm/build-wasm/openrealm.html
+            open-realm/build-wasm/openrealm.js
+            open-realm/build-wasm/openrealm.wasm
+            open-realm/build-wasm/openrealm.data
+          if-no-files-found: error
