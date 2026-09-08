@@ -1,0 +1,148 @@
+name: phaser4-browser-smoke
+
+on:
+  push:
+    branches: [spike/phaser4-renderer-v0]
+
+permissions:
+  contents: read
+
+jobs:
+  compare-browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+
+      - name: Checkout canonical baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 688a57e0f0c453e20da206515322c6b81b4cdf3f
+          path: baseline
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build baseline
+        working-directory: baseline
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Build candidate
+        working-directory: candidate
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Install isolated Playwright browser harness
+        run: |
+          mkdir -p /tmp/bite-night-playwright
+          cd /tmp/bite-night-playwright
+          npm init -y >/dev/null 2>&1
+          npm install playwright >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null
+          cat > smoke.mjs <<'EOF'
+          import { chromium } from 'playwright'
+          import fs from 'node:fs'
+
+          const [url, label, outDir] = process.argv.slice(2)
+          const samples = []
+          let screenshotTaken = false
+
+          for (let i = 0; i < 3; i += 1) {
+            const browser = await chromium.launch({ headless: true })
+            const page = await browser.newPage({ viewport: { width: 960, height: 540 } })
+            const errors = []
+            page.on('console', (msg) => { if (msg.type() === 'error') errors.push(`console: ${msg.text()}`) })
+            page.on('pageerror', (err) => errors.push(`pageerror: ${String(err)}`))
+
+            const started = performance.now()
+            const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 })
+            await page.waitForSelector('canvas', { timeout: 10000 })
+            const canvasReadyMs = performance.now() - started
+            await page.waitForTimeout(750)
+
+            const state = await page.evaluate(() => {
+              const canvas = document.querySelector('canvas')
+              const rect = canvas?.getBoundingClientRect()
+              const nav = performance.getEntriesByType('navigation')[0]
+              const paints = Object.fromEntries(performance.getEntriesByType('paint').map((p) => [p.name, p.startTime]))
+              return {
+                canvasCount: document.querySelectorAll('canvas').length,
+                canvasWidth: canvas?.width ?? null,
+                canvasHeight: canvas?.height ?? null,
+                displayWidth: rect?.width ?? null,
+                displayHeight: rect?.height ?? null,
+                navDurationMs: nav?.duration ?? null,
+                domContentLoadedMs: nav?.domContentLoadedEventEnd ?? null,
+                loadEventMs: nav?.loadEventEnd ?? null,
+                paints,
+              }
+            })
+
+            if (!screenshotTaken) {
+              await page.screenshot({ path: `${outDir}/${label}.png`, fullPage: false })
+              screenshotTaken = true
+            }
+
+            samples.push({
+              status: response?.status() ?? null,
+              canvasReadyMs,
+              errors,
+              ...state,
+            })
+            await browser.close()
+          }
+
+          fs.writeFileSync(`${outDir}/${label}.json`, JSON.stringify(samples, null, 2))
+          const bad = samples.some((s) => s.status !== 200 || s.canvasCount !== 1 || s.canvasWidth !== 960 || s.canvasHeight !== 540 || s.errors.length > 0)
+          if (bad) process.exit(1)
+          EOF
+
+      - name: Start static previews
+        run: |
+          nohup pnpm --dir baseline exec vite preview --host 127.0.0.1 --port 4173 > /tmp/baseline-preview.log 2>&1 &
+          echo $! > /tmp/baseline-preview.pid
+          nohup pnpm --dir candidate exec vite preview --host 127.0.0.1 --port 4174 > /tmp/candidate-preview.log 2>&1 &
+          echo $! > /tmp/candidate-preview.pid
+          for port in 4173 4174; do
+            for i in $(seq 1 30); do
+              if curl --fail --silent "http://127.0.0.1:${port}/" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl --fail --silent "http://127.0.0.1:${port}/" >/dev/null
+          done
+
+      - name: Run baseline browser smoke
+        run: |
+          mkdir -p browser-smoke
+          cd /tmp/bite-night-playwright
+          node smoke.mjs http://127.0.0.1:4173 baseline "$GITHUB_WORKSPACE/browser-smoke"
+
+      - name: Run Phaser 4 browser smoke
+        run: |
+          cd /tmp/bite-night-playwright
+          node smoke.mjs http://127.0.0.1:4174 phaser4 "$GITHUB_WORKSPACE/browser-smoke"
+
+      - name: Print browser metrics
+        run: |
+          echo '--- baseline ---'
+          cat browser-smoke/baseline.json
+          echo '--- phaser4 ---'
+          cat browser-smoke/phaser4.json
+
+      - name: Upload browser evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phaser4-browser-smoke
+          path: browser-smoke
+          if-no-files-found: error
