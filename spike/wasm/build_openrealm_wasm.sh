@@ -118,10 +118,12 @@ cat > build-wasm/shell.html <<'HTML'
 <script>
   var Module = {
     canvas: document.getElementById('canvas'),
+    arguments: ['-data', '/share'],
     print: (...args) => console.log(...args),
     printErr: (...args) => console.error(...args),
     setStatus: (text) => { document.getElementById('status').textContent = text || 'OpenRealm wasm running'; },
-    onRuntimeInitialized: () => { document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; }
+    onRuntimeInitialized: () => { document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; },
+    onAbort: (reason) => { document.getElementById('status').textContent = `OPENREALM_ABORT=${reason}`; }
   };
 </script>
 {{{ SCRIPT }}}

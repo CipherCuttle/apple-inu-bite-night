@@ -5,6 +5,10 @@ on:
     branches: [pivot/openrealm-wasm-spike-v0]
   workflow_dispatch:
 
+concurrency:
+  group: openrealm-wasm-spike-v0
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -43,6 +47,54 @@ jobs:
 
       - name: Compile and link actual OpenRealm engine
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
+
+      - name: Boot OpenRealm SDL WebGL2 in Chromium
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/openrealm-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/openrealm.html >/dev/null; then break; fi
+            sleep 0.25
+          done
+
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [[ -z "$chrome" ]]; then
+            echo 'No Chromium-family browser found on runner' >&2
+            exit 1
+          fi
+          echo "Using $chrome"
+
+          set +e
+          timeout 30s "$chrome" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --disable-gpu-sandbox \
+            --enable-webgl \
+            --ignore-gpu-blocklist \
+            --use-gl=angle \
+            --use-angle=swiftshader-webgl \
+            --enable-unsafe-swiftshader \
+            --window-size=1280,720 \
+            --virtual-time-budget=10000 \
+            --dump-dom \
+            http://127.0.0.1:8765/openrealm.html \
+            >/tmp/openrealm-dom.html 2>/tmp/openrealm-chrome.log
+          chrome_code=$?
+          set -e
+
+          cat /tmp/openrealm-dom.html
+          if ! grep -q 'OPENREALM_SDL_WEBGL_BOOT=PASS' /tmp/openrealm-dom.html; then
+            echo "Chromium exit code: $chrome_code" >&2
+            echo '--- chrome stderr ---' >&2
+            cat /tmp/openrealm-chrome.log >&2
+            echo '--- http log ---' >&2
+            cat /tmp/openrealm-http.log >&2
+            exit 1
+          fi
+          printf 'OPENREALM_SDL_WEBGL_BOOT=PASS\n'
 
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v4

@@ -159,4 +159,28 @@ replace(
     "void PF_Sleep(DWORD msec) {\n#ifdef __EMSCRIPTEN__\n    (void)msec;\n#else\n    usleep(msec * 1000);\n#endif\n}\n",
 )
 
+# A browser smoke only counts after the actual OpenRealm client init returns
+# with the SDL GL context that the renderer created. BZ_GL_ES3 requests ES 3,
+# which Emscripten maps to WebGL2 under the link settings in the spike harness.
+replace(
+    "common/main.c",
+    "        SV_Init();\n        CL_Init();\n        if (load_map_from_save) {\n",
+    "        SV_Init();\n        CL_Init();\n#ifdef __EMSCRIPTEN__\n"
+    "        {\n"
+    "            int gl_major = 0;\n"
+    "            if (!SDL_GL_GetCurrentContext() || SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &gl_major) != 0 || gl_major < 3) {\n"
+    "                fprintf(stderr, \"OPENREALM_SDL_WEBGL_BOOT=FAIL major=%d error=%s\\n\", gl_major, SDL_GetError());\n"
+    "                return 2;\n"
+    "            }\n"
+    "            fprintf(stderr, \"OPENREALM_SDL_WEBGL_BOOT=PASS major=%d\\n\", gl_major);\n"
+    "            EM_ASM({\n"
+    "                globalThis.__OPENREALM_SDL_WEBGL_BOOT = true;\n"
+    "                const status = document.getElementById('status');\n"
+    "                if (status) status.textContent = 'OPENREALM_SDL_WEBGL_BOOT=PASS';\n"
+    "            });\n"
+    "        }\n"
+    "#endif\n"
+    "        if (load_map_from_save) {\n",
+)
+
 print("OpenRealm browser overlay applied")
