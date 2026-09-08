@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { BASE_SWORD, type AttackKind } from '../combat/Sword'
+import { DesktopCombatInput } from '../input/DesktopCombatInput'
 import { ARENA_BOUNDS, GameState, type InputState } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import { GoreFx } from '../../presentation/GoreFx'
@@ -8,6 +9,8 @@ import { Sfx } from '../../presentation/Sfx'
 
 const WORLD_CX = 480
 const WORLD_CY = 270
+const WORLD_WIDTH = 960
+const WORLD_HEIGHT = 540
 const ENEMY_CAPACITY = 220
 
 export class GameScene extends Phaser.Scene {
@@ -19,15 +22,17 @@ export class GameScene extends Phaser.Scene {
   private sword!: Phaser.GameObjects.Rectangle
   private swordTrails: Phaser.GameObjects.Rectangle[] = []
   private crosshair!: Phaser.GameObjects.Container
+  private aimGuide!: Phaser.GameObjects.Graphics
+  private inputText!: Phaser.GameObjects.Text
   private hpText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
   private killText!: Phaser.GameObjects.Text
   private zombieSprites: Phaser.GameObjects.Image[] = []
   private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
+  private desktopInput!: DesktopCombatInput
   private gore!: GoreFx
   private endedText?: Phaser.GameObjects.Text
   private hitStopMs = 0
-  private mouseActive = false
   private queuedSlash = false
   private queuedStab = false
 
@@ -39,6 +44,8 @@ export class GameScene extends Phaser.Scene {
     this.createEnemyRenderPool()
     this.createCrosshair()
     this.createHud()
+
+    this.desktopInput = new DesktopCombatInput(this.game.canvas, WORLD_WIDTH, WORLD_HEIGHT, () => this.sfx.unlock())
 
     const keyboard = this.input.keyboard
     if (!keyboard) throw new Error('Keyboard input unavailable')
@@ -58,19 +65,8 @@ export class GameScene extends Phaser.Scene {
     })
     keyboard.on('keydown-R', () => this.restartRun())
 
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (!pointer.wasTouch) this.mouseActive = true
-    })
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      this.sfx.unlock()
-      if (pointer.wasTouch) return
-      this.mouseActive = true
-      if (pointer.leftButtonDown()) this.queuedSlash = true
-      if (pointer.rightButtonDown()) this.queuedStab = true
-    })
-    this.game.canvas.addEventListener('contextmenu', this.preventContextMenu)
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.game.canvas.removeEventListener('contextmenu', this.preventContextMenu)
+      this.desktopInput.destroy()
     })
   }
 
@@ -91,22 +87,18 @@ export class GameScene extends Phaser.Scene {
     this.gore.update(delta)
   }
 
-  private readonly preventContextMenu = (event: Event) => {
-    event.preventDefault()
-  }
-
   private readInputForTick(): InputState {
+    const pointer = this.desktopInput.snapshot()
+    const mouseAttacks = this.desktopInput.consumeAttacks()
     const input: InputState = {
       x: Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
       y: Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
-      slash: this.queuedSlash,
-      stab: this.queuedStab,
+      slash: this.queuedSlash || mouseAttacks.slash,
+      stab: this.queuedStab || mouseAttacks.stab,
     }
 
-    if (this.mouseActive) {
-      const pointer = this.input.activePointer
-      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
-      input.aimRadians = Math.atan2(world.y - (WORLD_CY + this.state.player.y), world.x - (WORLD_CX + this.state.player.x))
+    if (pointer.active) {
+      input.aimRadians = Math.atan2(pointer.y - (WORLD_CY + this.state.player.y), pointer.x - (WORLD_CX + this.state.player.x))
     }
 
     this.queuedSlash = false
@@ -173,15 +165,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncPointerPresentation(): void {
-    if (!this.mouseActive || !this.crosshair) return
-    const pointer = this.input.activePointer
+    if (!this.desktopInput || !this.crosshair || !this.aimGuide || !this.inputText) return
+    const pointer = this.desktopInput.snapshot()
+    this.aimGuide.clear()
+
+    if (!pointer.active) {
+      this.crosshair.setVisible(false)
+      this.inputText.setText('INPUT: MOVE MOUSE TO ARM CURSOR')
+      return
+    }
+
+    const playerX = WORLD_CX + this.state.player.x
+    const playerY = WORLD_CY + this.state.player.y
+    const aimRadians = Math.atan2(pointer.y - playerY, pointer.x - playerX)
+    const aimDegrees = Math.round((aimRadians * 180) / Math.PI)
+
+    this.aimGuide.lineStyle(1, 0xff4f8d, 0.34)
+    this.aimGuide.lineBetween(playerX, playerY, pointer.x, pointer.y)
     this.crosshair.setVisible(true).setPosition(pointer.x, pointer.y)
+    this.inputText.setText(`INPUT: MOUSE ✓  AIM ${aimDegrees}°  LMB ${pointer.leftClicks}  RMB ${pointer.rightClicks}`)
   }
 
   private createArena(): void {
     const graphics = this.add.graphics().setDepth(0)
     graphics.fillStyle(0x09070d, 1)
-    graphics.fillRect(0, 0, 960, 540)
+    graphics.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT)
     graphics.fillStyle(0x120b18, 1)
     graphics.fillRect(
       WORLD_CX - ARENA_BOUNDS.halfWidth,
@@ -190,8 +198,8 @@ export class GameScene extends Phaser.Scene {
       ARENA_BOUNDS.halfHeight * 2,
     )
     graphics.lineStyle(1, 0x2a1835, 0.42)
-    for (let x = 0; x <= 960; x += 32) graphics.lineBetween(x, 0, x, 540)
-    for (let y = 0; y <= 540; y += 32) graphics.lineBetween(0, y, 960, y)
+    for (let x = 0; x <= WORLD_WIDTH; x += 32) graphics.lineBetween(x, 0, x, WORLD_HEIGHT)
+    for (let y = 0; y <= WORLD_HEIGHT; y += 32) graphics.lineBetween(0, y, WORLD_WIDTH, y)
     graphics.lineStyle(2, 0x7a204e, 0.72)
     graphics.strokeRect(
       WORLD_CX - ARENA_BOUNDS.halfWidth,
@@ -266,6 +274,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createCrosshair(): void {
+    this.aimGuide = this.add.graphics().setDepth(140)
     const graphics = this.add.graphics()
     graphics.lineStyle(2, 0xf44f7f, 0.92)
     graphics.strokeCircle(0, 0, 8)
@@ -288,6 +297,7 @@ export class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(16, 14, '', style).setDepth(100)
     this.timerText = this.add.text(480, 14, '', style).setOrigin(0.5, 0).setDepth(100)
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
+    this.inputText = this.add.text(16, 486, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
     this.add.text(16, 510, 'WASD MOVE  •  MOUSE AIM  •  LMB SLASH  •  RMB STAB  •  R RESTART', { ...style, fontSize: '12px', color: '#a998b6' }).setDepth(100)
   }
 
@@ -331,6 +341,7 @@ export class GameScene extends Phaser.Scene {
     this.hitStopMs = 0
     this.queuedSlash = false
     this.queuedStab = false
+    this.desktopInput.consumeAttacks()
     this.gore.resetTransient()
     this.endedText?.destroy()
     this.endedText = undefined
