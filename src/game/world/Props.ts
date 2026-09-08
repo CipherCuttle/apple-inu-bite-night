@@ -14,13 +14,13 @@ export interface PropState {
 
 export function createImpactProps(): PropState[] {
   return [
-    makeProp(1, -185, -105, 24, 2, 'wood', 10),
-    makeProp(2, -120, -115, 17, 1, 'wood', 8),
-    makeProp(3, 150, -122, 17, 1, 'glass', 5),
-    makeProp(4, 194, -122, 17, 1, 'glass', 5),
-    makeProp(5, -245, 125, 19, 3, 'metal', 22),
-    makeProp(6, 122, 112, 22, 2, 'wood', 11),
-    makeProp(7, 176, 134, 22, 2, 'wood', 11),
+    makeProp(1, -185, -105, 24, 2, 'wood', 6),
+    makeProp(2, -120, -115, 17, 1, 'wood', 5.5),
+    makeProp(3, 150, -122, 17, 1, 'glass', 3),
+    makeProp(4, 194, -122, 17, 1, 'glass', 3),
+    makeProp(5, -245, 125, 19, 3, 'metal', 14),
+    makeProp(6, 122, 112, 22, 2, 'wood', 6.5),
+    makeProp(7, 176, 134, 22, 2, 'wood', 6.5),
   ]
 }
 
