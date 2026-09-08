@@ -1,0 +1,474 @@
+{
+  "version": 2,
+  "generated_at": "2026-09-08",
+  "policy": "No third-party binary enters public/assets unless its source page, license, provenance and exact bytes are recorded. Page-level CC0 claims are not treated as archive-level verification.",
+  "verification_states": {
+    "PAGE_VERIFIED": "Publisher/source page and license are verified, but archive bytes have not been hashed in our intake.",
+    "PINNED_MIRROR_VERIFIED": "Publisher source plus a pinned public mirror metadata record are verified. Individual imported bytes still require local hash capture before shipping.",
+    "ARCHIVE_HASH_VERIFIED": "Exact downloaded archive SHA-256 has been recorded and matched.",
+    "IMPORTED_CANONICAL": "Selected files were normalized into Bite Night art conventions and recorded in assets[]."
+  },
+  "sources": [
+    {
+      "id": "project-owned-apple-inu-v0",
+      "priority": "P0",
+      "purpose": [
+        "canonical player identity"
+      ],
+      "author": "Apple Inu project",
+      "source_page": null,
+      "license": "PROJECT_OWNED",
+      "verification": "IMPORTED_CANONICAL",
+      "intake_status": "PROJECT_OWNED_CANONICAL",
+      "shipping_rule": "Preserve apple-red head, green leaf/stem, dog muzzle/ears/paws/tail, and visible mouth-held sword.",
+      "destinations": [
+        "public/assets/characters/apple-inu/"
+      ]
+    },
+    {
+      "id": "spriteattack-freeart-topdown-zombies",
+      "priority": "P0",
+      "purpose": [
+        "zombie anatomy donor",
+        "exploded body parts",
+        "top-down animation reference"
+      ],
+      "author": "SpriteAttack",
+      "source_page": "https://opengameart.org/content/freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "3 top-down zombies",
+        "SVG source files",
+        "exploded body parts",
+        "animation samples for 2 zombies"
+      ],
+      "archive": {
+        "filename": "FreeArt_Topdown_Zombies.zip",
+        "source_url": "https://opengameart.org/sites/default/files/FreeArt_Topdown_Zombies_0.zip",
+        "declared_size": "603.4 KiB",
+        "sha256": "979cba6b4e64fd10f496ca56f4576ad379e91ef00616c617366bf53d002964b2",
+        "staging_path": "vendor/asset-inbox/FreeArt_Topdown_Zombies.zip"
+      },
+      "verification": "ARCHIVE_HASH_VERIFIED",
+      "intake_status": "ARCHIVE_HASH_VERIFIED_CANONICAL_SUBSET_IMPORTED",
+      "shipping_rule": "Use as anatomy/vector raw material; normalize palette, silhouette and body-part pivots before shipping.",
+      "destinations": [
+        "public/assets/enemies/zombies/base/",
+        "public/assets/enemies/zombies/parts/"
+      ]
+    },
+    {
+      "id": "spriteattack-topdown-soldier",
+      "priority": "P0",
+      "purpose": [
+        "human top-down anatomy donor",
+        "SVG/PDF body-part construction reference"
+      ],
+      "author": "SpriteAttack",
+      "source_page": "https://opengameart.org/content/topdown-soldier",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "vector SVG and PDF source files",
+        "top-down human body parts"
+      ],
+      "archive": {
+        "filename": "topdown1_tutorial_art.zip",
+        "source_url": "https://opengameart.org/sites/default/files/topdown1_tutorial_art.zip",
+        "declared_size": "418.5 KiB",
+        "sha256": "1841dc406f58360a55ac9256345ba68635f0e0840d273091de8785fc66598c88",
+        "staging_path": "vendor/asset-inbox/topdown1_tutorial_art.zip"
+      },
+      "verification": "ARCHIVE_HASH_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Use to improve human/zombie anatomy construction; final zombie art must remain visibly undead and canonicalized.",
+      "destinations": [
+        "art/source/anatomy/"
+      ]
+    },
+    {
+      "id": "reactorcore-gore-blood-gibs-meat-chunks",
+      "priority": "P0",
+      "purpose": [
+        "meat chunks",
+        "bones",
+        "organs",
+        "gore particle raw material"
+      ],
+      "author": "Reactorcore",
+      "source_page": "https://opengameart.org/content/gore-blood-gibs-meat-chunks",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "gore/blood/gib pixel sprites",
+        "meat",
+        "bones",
+        "organs",
+        "dismemberment use"
+      ],
+      "archive": {
+        "filename": "rc_art_-_gore_blood_gibs.zip",
+        "source_url": "https://opengameart.org/sites/default/files/rc_art_-_gore_blood_gibs.zip",
+        "declared_size": "75.7 KiB",
+        "sha256": "59917f2f8aec67316aff9869000d11e19e68b296b7f8f9deb606c587b09c6af5",
+        "staging_path": "vendor/asset-inbox/rc_art_-_gore_blood_gibs.zip"
+      },
+      "verification": "ARCHIVE_HASH_VERIFIED",
+      "intake_status": "ARCHIVE_HASH_VERIFIED_CANONICAL_SUBSET_IMPORTED",
+      "shipping_rule": "Import only a bounded curated subset; preserve GoreBudget caps and never make individual blood droplets authoritative physics bodies.",
+      "destinations": [
+        "public/assets/gore/gibs/"
+      ]
+    },
+    {
+      "id": "overcrafted-bloodsplatter-bloodsplash",
+      "priority": "P0",
+      "purpose": [
+        "animated blood splash",
+        "animated blood splatter"
+      ],
+      "author": "overcrafted",
+      "source_page": "https://opengameart.org/content/bloodsplatter-and-bloodsplash-animation",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "bloodsplash frames and spritesheet",
+        "bloodsplatter animation",
+        "GIMP source included"
+      ],
+      "archive": {
+        "filename": "bloodsplat.zip",
+        "source_url": "https://opengameart.org/sites/default/files/bloodsplat.zip",
+        "declared_size": "516.7 KiB",
+        "sha256": "386d47da0f6d4b1ce699ef049f204bbec1c6a9312e7efbaab15bd3992f23816f",
+        "staging_path": "vendor/asset-inbox/bloodsplat.zip"
+      },
+      "verification": "ARCHIVE_HASH_VERIFIED",
+      "intake_status": "ARCHIVE_HASH_VERIFIED_CANONICAL_SUBSET_IMPORTED",
+      "shipping_rule": "Use one normalized splash sheet plus a small set of splat frames; color-grade to Bite Night blood palette.",
+      "destinations": [
+        "public/assets/gore/splashes/"
+      ]
+    },
+    {
+      "id": "kenney-top-down-shooter",
+      "priority": "P0",
+      "purpose": [
+        "breakable furniture",
+        "doors",
+        "arena props",
+        "urban tiles"
+      ],
+      "author": "Kenney",
+      "source_page": "https://kenney.nl/assets/top-down-shooter",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "580 listed 2D files",
+        "top-down",
+        "furniture",
+        "zombie tags"
+      ],
+      "pinned_mirror": {
+        "repository": "Tiddybub/2d-assets",
+        "commit": "e0cbe0d995554a490d4c182fe9beb8769ffbb606",
+        "path": "modern-urban/top-down-shooter",
+        "source_metadata_path": "modern-urban/top-down-shooter/SOURCE.md",
+        "mirror_file_count": 601
+      },
+      "verification": "PINNED_MIRROR_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_SELECTIVE_IMPORT",
+      "shipping_rule": "Use environment/prop material only; do not use Kenney zombie characters as final Bite Night zombie identity.",
+      "destinations": [
+        "public/assets/arena/props/",
+        "public/assets/arena/tiles/"
+      ]
+    },
+    {
+      "id": "kenney-splat-pack",
+      "priority": "P1",
+      "purpose": [
+        "supplementary floor splats",
+        "non-anatomical decal shapes"
+      ],
+      "author": "Kenney",
+      "source_page": "https://kenney.nl/assets/splat-pack",
+      "license": "CC0-1.0",
+      "pinned_mirror": {
+        "repository": "Tiddybub/2d-assets",
+        "commit": "e0cbe0d995554a490d4c182fe9beb8769ffbb606",
+        "path": "effects/splat-pack",
+        "source_metadata_path": "effects/splat-pack/SOURCE.md",
+        "mirror_file_count": 111,
+        "mirror_safety_scan_removed_files": 2
+      },
+      "verification": "PINNED_MIRROR_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_SELECTIVE_IMPORT",
+      "shipping_rule": "Use only as decal supplement after the authored blood animation/gib assets.",
+      "destinations": [
+        "public/assets/gore/decals/"
+      ]
+    },
+    {
+      "id": "shepardskin-dog-sprites",
+      "priority": "P1",
+      "purpose": [
+        "dog locomotion timing donor",
+        "secondary motion reference"
+      ],
+      "author": "Shepardskin",
+      "source_page": "https://opengameart.org/content/dog-sprites",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "original sprite sheet",
+        "6 animations",
+        "walk cycle",
+        "1x/2x/4x sizes"
+      ],
+      "archive": {
+        "filename": "dog.zip",
+        "source_url": "https://opengameart.org/sites/default/files/dog.zip",
+        "declared_size": "32.9 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/dog.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Motion/reference donor only. Final visible Apple Inu pixels must be custom and must preserve the canonical apple-dog silhouette, leaf/stem, muzzle and mouth-held sword.",
+      "destinations": [
+        "art/reference/apple-inu-motion/"
+      ]
+    },
+    {
+      "id": "rgs-modular-animated-vector-characters",
+      "priority": "P1",
+      "purpose": [
+        "modular-body rig architecture reference",
+        "detachable body-part workflow reference"
+      ],
+      "author": "RGS_Dev",
+      "source_page": "https://rgsdev.itch.io/free-cc0-modular-animated-vector-characters-2d",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "separated animated body parts",
+        "idle/walk/roll/jump/hit/death",
+        "69 MB free archive",
+        "no generative AI"
+      ],
+      "archive": {
+        "filename": "Free 2D Animated Vector Game Character Sprites.zip",
+        "source_url": null,
+        "declared_size": "69 MB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/Free 2D Animated Vector Game Character Sprites.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_ITch_SESSION_DOWNLOAD_NOT_BYTE_VERIFIED",
+      "shipping_rule": "Do not import production pixels until the itch archive is locally downloaded and hashed. Safe to study the modular-body concept now.",
+      "destinations": [
+        "art/reference/modular-body/"
+      ]
+    },
+    {
+      "id": "hormelz-free-8-directional-melee-character",
+      "priority": "P1",
+      "purpose": [
+        "8-direction melee timing reference",
+        "attack/strafe/hit/death pose study"
+      ],
+      "author": "Hormelz",
+      "source_page": "https://hormelz.itch.io/8-directional-melee-character",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "30+ animations",
+        "8-direction top-down/2.5D use",
+        "free CC0 pack",
+        "no AI tag on creator page"
+      ],
+      "archive": {
+        "filename": "MeleeCharacter.zip",
+        "source_url": null,
+        "declared_size": "13 MB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/MeleeCharacter.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_ITch_SESSION_DOWNLOAD_NOT_BYTE_VERIFIED",
+      "shipping_rule": "Animation study first; do not make this humanoid character part of the final visual identity.",
+      "destinations": [
+        "art/reference/melee-motion/"
+      ]
+    },
+    {
+      "id": "rgs-cc0-melee-weapon-generator",
+      "priority": "P2",
+      "purpose": [
+        "sword silhouette ideation",
+        "CC0 generated melee weapon parts"
+      ],
+      "author": "RGS_Dev",
+      "source_page": "https://rgsdev.itch.io/free-cc0-melee-weapon-sprite-generator-online",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "generated assets may be used freely",
+        "blade/guard/grip/pommel/decor customization"
+      ],
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "OPTIONAL_TOOL_APPROVED",
+      "shipping_rule": "Prefer a custom Apple Inu sword. If generator output is used, record the exported file as a derived asset with its own SHA-256.",
+      "destinations": [
+        "public/assets/weapons/"
+      ]
+    },
+    {
+      "id": "game-icons",
+      "priority": "DEFERRED",
+      "purpose": [
+        "future upgrade icons"
+      ],
+      "author": "multiple",
+      "source_page": "https://game-icons.net/",
+      "license": "CC-BY-3.0",
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "DEFERRED_NOT_PART_OF_IDENTITY_PASS",
+      "shipping_rule": "Not part of the current identity pass; attribution ledger required if used later.",
+      "destinations": [
+        "public/assets/upgrades/"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "id": "characters-apple-inu-body",
+      "source_id": "project-owned-apple-inu-v0",
+      "license": "PROJECT_OWNED",
+      "path": "public/assets/characters/apple-inu/body.png",
+      "sha256": "38b022e0c98838521982b7a7a30a52b5499b791573cc552e756179f982029a4b",
+      "modified": false
+    },
+    {
+      "id": "characters-apple-inu-head",
+      "source_id": "project-owned-apple-inu-v0",
+      "license": "PROJECT_OWNED",
+      "path": "public/assets/characters/apple-inu/head.png",
+      "sha256": "8376d178242f84fef42c202aa2756addf09045726122891fc1605c2fb2c5d764",
+      "modified": false
+    },
+    {
+      "id": "characters-apple-inu-sword",
+      "source_id": "project-owned-apple-inu-v0",
+      "license": "PROJECT_OWNED",
+      "path": "public/assets/characters/apple-inu/sword.png",
+      "sha256": "f90f6a2ab24f74c61eda8ad14116bb5fff22af025b67fbb1b9da8c16306e5f25",
+      "modified": false
+    },
+    {
+      "id": "enemies-zombies-walker",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/walker.png",
+      "sha256": "0fa634f74d11367cd5561426b0208ee28a4b9a93b07da614053dabc8459f10d0",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-heavy",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/heavy.png",
+      "sha256": "4b5570a97e038e7ab33eac3393075bb2f57aced92d57b7208e619b180ca0d408",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-heavy-missing-left-arm",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/heavy-missing-left-arm.png",
+      "sha256": "d2aa4a26dfbe2ef80235d65c322032cb98252d2602e6881592ac8547eb3e0820",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-heavy-missing-right-arm",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/heavy-missing-right-arm.png",
+      "sha256": "636a4b341a8a46d611c57d55552829b8e6fc779da697d30cc8c3826869a87c82",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-parts-arm-left",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/parts/arm-left.png",
+      "sha256": "d8dbe08375210211cdde28cbbf56c717137256d898af9902a1198eaf251e9c27",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-parts-arm-right",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/parts/arm-right.png",
+      "sha256": "a6a89db123271350eec69a942b1c5e3fbfbe77a918a67dd3bca7b0b1dfeea59b",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-parts-torso-head",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/parts/torso-head.png",
+      "sha256": "41b6e3b1cd920d2452de6b04d6fb73527854712ced468c0e455f81a86188a675",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-parts-leg-left",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/parts/leg-left.png",
+      "sha256": "b1ab0969d01a157021494e0c06972a72d3f728f17518fa0933bd2525a6e43414",
+      "modified": true
+    },
+    {
+      "id": "enemies-zombies-parts-leg-right",
+      "source_id": "spriteattack-freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "path": "public/assets/enemies/zombies/parts/leg-right.png",
+      "sha256": "d944aaaeb7b3a8db621ce629a74ffad418bb3a229238d565ffeaff76f808c612",
+      "modified": true
+    },
+    {
+      "id": "gore-gibs-meat-1",
+      "source_id": "reactorcore-gore-blood-gibs-meat-chunks",
+      "license": "CC0-1.0",
+      "path": "public/assets/gore/gibs/meat-1.png",
+      "sha256": "613932cc76f05a0c23ba79e75d273f7ab14e73142d956be4788d4baf42f08ea9",
+      "modified": false
+    },
+    {
+      "id": "gore-gibs-meat-7",
+      "source_id": "reactorcore-gore-blood-gibs-meat-chunks",
+      "license": "CC0-1.0",
+      "path": "public/assets/gore/gibs/meat-7.png",
+      "sha256": "cbb73b61c253a0ac9368ff0dd6acaadb1d9975e8411151ce05c7e618081b9b99",
+      "modified": false
+    },
+    {
+      "id": "gore-gibs-meat-12",
+      "source_id": "reactorcore-gore-blood-gibs-meat-chunks",
+      "license": "CC0-1.0",
+      "path": "public/assets/gore/gibs/meat-12.png",
+      "sha256": "7553a0ce187b292bab74c947bd0e10a58ef6c1fd3958072fae68d757c63255a9",
+      "modified": false
+    },
+    {
+      "id": "gore-decals-trail-2",
+      "source_id": "overcrafted-bloodsplatter-bloodsplash",
+      "license": "CC0-1.0",
+      "path": "public/assets/gore/decals/trail-2.png",
+      "sha256": "ef045b54879ff3b6f375c85e060864fe1d75fafadbd6a7290e05139730803a1b",
+      "modified": false
+    },
+    {
+      "id": "gore-decals-trail-4",
+      "source_id": "overcrafted-bloodsplatter-bloodsplash",
+      "license": "CC0-1.0",
+      "path": "public/assets/gore/decals/trail-4.png",
+      "sha256": "fd536531407c11438785c669ad3ef128b9cad80f091d32ae0e9aff9d2d95c73e",
+      "modified": false
+    }
+  ]
+}
