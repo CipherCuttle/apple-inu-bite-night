@@ -16,3 +16,9 @@ Archive SHA-256 values are frozen in `licenses/ASSET_MANIFEST.json`. `scripts/au
 Identity migration source commit: `21a7c3ebf2b5c2d61dd673d4d5cec0155a7aaf19`.
 
 The import migration verified the exact archive hashes, generated the canonical subset, then passed frozen install, lint, TypeScript, the full Vitest suite, production build, and the determinism regression before committing. This documentation commit intentionally triggers the normal repository CI and preview publishers against the resulting runtime.
+
+## Player Identity V1 — white Apple Inu + side-bite sword
+
+The visible player is rendered as a white/off-white dog with cool-gray shadowing, four readable paws, tail, and an Apple-product-like bitten-apple-shaped white head with green leaf/stem. The sword is no longer held straight forward: its idle/rest transform is approximately 76° off the facing axis and the hilt is layered between distinct upper/lower jaw shapes so it reads as physically bitten from the side.
+
+The normal slash keeps the sword clamped at that side-bite angle while the entire head rig sweeps through a broad arc. Stab/dash may temporarily angle the blade toward travel for readability, then return to the side-bite rest transform. Combat timing, hit geometry, damage, enemy density and deterministic physics are unchanged in this pass.

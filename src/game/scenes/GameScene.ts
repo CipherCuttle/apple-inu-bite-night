@@ -14,7 +14,8 @@ const WORLD_WIDTH = 960
 const WORLD_HEIGHT = 540
 const ENEMY_CAPACITY = 220
 const SLASH_TRAIL_ANGLES = [-0.72, -0.36, 0, 0.36, 0.72]
-const SWORD_MOUTH_X = 26
+const SWORD_MOUTH_X = 28
+const SWORD_REST_ANGLE = -Math.PI * 0.42
 
 export class GameScene extends Phaser.Scene {
   private readonly fixed = new FixedTick()
@@ -46,8 +47,6 @@ export class GameScene extends Phaser.Scene {
   private queuedWhirlwind = false
 
   preload(): void {
-    this.load.image('apple-inu-body', 'assets/characters/apple-inu/body.png')
-    this.load.image('apple-inu-head', 'assets/characters/apple-inu/head.png')
     this.load.image('apple-inu-sword', 'assets/characters/apple-inu/sword.png')
     this.load.image('zombie-walker', 'assets/enemies/zombies/walker.png')
     this.load.image('zombie-heavy', 'assets/enemies/zombies/heavy.png')
@@ -314,21 +313,84 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(): void {
     const bladeLength = BASE_SWORD.outerRadius - BASE_SWORD.innerRadius
+    const dark = 0x17151b
+    const fur = 0xf5f4ee
+    const furHighlight = 0xffffff
+    const furShade = 0xd7dae2
+    const green = 0x5bbd4a
+
     const makeTrail = (angle: number) =>
       this.add
         .rectangle(SWORD_MOUTH_X, 0, bladeLength, 11, 0xff4f8d, 1)
         .setOrigin(0, 0.5)
-        .setRotation(angle)
+        .setRotation(SWORD_REST_ANGLE + angle)
         .setAlpha(0)
 
     this.swordTrails = SLASH_TRAIL_ANGLES.map(makeTrail)
-    const body = this.add.image(-4, 0, 'apple-inu-body').setScale(0.78)
-    const head = this.add.image(13, 0, 'apple-inu-head').setScale(0.74)
-    this.sword = this.add.image(SWORD_MOUTH_X, 0, 'apple-inu-sword').setOrigin(0, 0.5)
 
-    // Sword is behind the head so the muzzle visibly clamps the hilt.
-    this.headRig = this.add.container(0, 0, [...this.swordTrails, this.sword, head])
-    this.player = this.add.container(WORLD_CX, WORLD_CY, [body, this.headRig]).setDepth(10)
+    const shadow = this.add.ellipse(-7, 7, 58, 34, 0x000000, 0.28)
+    const tail = this.add.ellipse(-31, -2, 23, 9, furShade).setStrokeStyle(3, dark).setRotation(-0.72)
+    const hind = this.add.ellipse(-22, 0, 23, 23, fur).setStrokeStyle(3, dark)
+    const body = this.add.ellipse(-5, 0, 48, 31, fur).setStrokeStyle(3, dark)
+    const chest = this.add.ellipse(8, 0, 29, 25, furHighlight).setStrokeStyle(2, dark)
+    const pawBackTop = this.add.ellipse(-18, -14, 15, 8, furShade).setStrokeStyle(2, dark).setRotation(-0.18)
+    const pawBackBottom = this.add.ellipse(-18, 14, 15, 8, furShade).setStrokeStyle(2, dark).setRotation(0.18)
+    const pawFrontTop = this.add.ellipse(5, -15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(-0.12)
+    const pawFrontBottom = this.add.ellipse(5, 15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(0.12)
+
+    // Apple-product-like bitten-apple silhouette, rendered as the head itself.
+    const headOutline = this.add.ellipse(15, 0, 43, 41, dark)
+    const appleMid = this.add.ellipse(14, 1, 35, 35, fur)
+    const appleLobeTop = this.add.circle(8, -10, 13, furHighlight)
+    const appleLobeBottom = this.add.circle(8, 10, 13, fur)
+    const appleFront = this.add.ellipse(20, 1, 26, 31, fur)
+    const biteUpper = this.add.circle(32, -5, 6, dark)
+    const biteLower = this.add.circle(33, 5, 5, dark)
+    const stem = this.add.rectangle(13, -22, 4, 9, 0x79513a).setRotation(0.22)
+    const leaf = this.add.ellipse(5, -26, 17, 8, green).setStrokeStyle(2, dark).setRotation(-0.42)
+
+    // Side-bite clamp: sword hilt is physically layered between lower and upper jaw.
+    const lowerJaw = this.add.ellipse(SWORD_MOUTH_X - 2, 4, 18, 8, furShade).setStrokeStyle(2, dark)
+    this.sword = this.add
+      .image(SWORD_MOUTH_X, 0, 'apple-inu-sword')
+      .setOrigin(0.08, 0.5)
+      .setRotation(SWORD_REST_ANGLE)
+      .setScale(1.04)
+    const upperJaw = this.add.ellipse(SWORD_MOUTH_X - 2, -4, 18, 8, furHighlight).setStrokeStyle(2, dark)
+    const toothTop = this.add.triangle(SWORD_MOUTH_X + 1, -1, 0, 0, 5, 0, 2, 5, 0xfefefe).setRotation(0.08)
+    const toothBottom = this.add.triangle(SWORD_MOUTH_X + 1, 1, 0, 0, 5, 0, 2, -5, 0xe9e9e5).setRotation(-0.08)
+
+    this.headRig = this.add.container(0, 0, [
+      ...this.swordTrails,
+      headOutline,
+      appleMid,
+      appleLobeTop,
+      appleLobeBottom,
+      appleFront,
+      biteUpper,
+      biteLower,
+      stem,
+      leaf,
+      lowerJaw,
+      this.sword,
+      upperJaw,
+      toothTop,
+      toothBottom,
+    ])
+    this.player = this.add
+      .container(WORLD_CX, WORLD_CY, [
+        shadow,
+        tail,
+        pawBackTop,
+        pawBackBottom,
+        hind,
+        body,
+        chest,
+        pawFrontTop,
+        pawFrontBottom,
+        this.headRig,
+      ])
+      .setDepth(10)
   }
 
   private animateSword(event: Extract<SimEvent, { type: 'sword-attack' }>): void {
@@ -338,62 +400,87 @@ export class GameScene extends Phaser.Scene {
     for (const trail of this.swordTrails) this.tweens.killTweensOf(trail)
 
     this.headRig.setPosition(0, 0).setRotation(0)
-    this.sword.setPosition(SWORD_MOUTH_X, 0).setScale(1, 1).setAlpha(1)
+    this.sword
+      .setPosition(SWORD_MOUTH_X, 0)
+      .setRotation(SWORD_REST_ANGLE)
+      .setScale(1.04, 1.04)
+      .setAlpha(1)
     for (let i = 0; i < this.swordTrails.length; i += 1) {
-      this.swordTrails[i].setRotation(SLASH_TRAIL_ANGLES[i]).setAlpha(0).setScale(1, 1)
+      this.swordTrails[i]
+        .setRotation(SWORD_REST_ANGLE + SLASH_TRAIL_ANGLES[i])
+        .setAlpha(0)
+        .setScale(1, 1)
     }
 
     if (attack === 'slash') {
-      this.headRig.setPosition(-3, -2).setRotation(-1.32)
-      this.sword.setScale(1.08, 1.42)
+      // Head-led sweep: the blade stays clenched sideways while the full head rig whips through the arc.
+      this.headRig.setPosition(-3, -2).setRotation(-1.35)
+      this.sword.setScale(1.09, 1.34)
       for (let i = 0; i < this.swordTrails.length; i += 1) {
         const distanceFromCenter = Math.abs(i - (this.swordTrails.length - 1) / 2)
-        this.swordTrails[i].setAlpha(0.42 - distanceFromCenter * 0.07).setScale(1.06, 1.34)
+        this.swordTrails[i].setAlpha(0.5 - distanceFromCenter * 0.075).setScale(1.08, 1.28)
       }
       this.tweens.add({
         targets: this.headRig,
-        x: 4,
+        x: 5,
         y: 2,
-        rotation: 1.18,
-        duration: 155,
+        rotation: 1.55,
+        duration: 150,
         ease: 'Cubic.Out',
         onComplete: () => {
-          this.tweens.add({ targets: this.headRig, x: 0, y: 0, rotation: 0, duration: 75, ease: 'Quad.Out' })
+          this.tweens.add({ targets: this.headRig, x: 0, y: 0, rotation: 0, duration: 72, ease: 'Quad.Out' })
         },
       })
     } else if (attack === 'stab') {
       this.headRig.setX(-4)
-      this.sword.setX(SWORD_MOUTH_X - 5).setScale(1.12, 0.9)
-      this.swordTrails[2].setRotation(0).setAlpha(0.42).setScale(1.3, 0.75)
-      this.tweens.add({ targets: this.headRig, x: 12, duration: 58, yoyo: true, ease: 'Quad.Out' })
-      this.tweens.add({ targets: this.sword, x: SWORD_MOUTH_X + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
+      this.sword.setScale(1.12, 0.92)
+      this.swordTrails[2].setRotation(-0.12).setAlpha(0.4).setScale(1.3, 0.72)
+      this.tweens.add({ targets: this.headRig, x: 11, duration: 56, yoyo: true, ease: 'Quad.Out' })
+      this.tweens.add({
+        targets: this.sword,
+        x: SWORD_MOUTH_X + 21,
+        rotation: -0.12,
+        scaleX: 1.25,
+        duration: 56,
+        yoyo: true,
+        ease: 'Quad.Out',
+        onComplete: () => this.sword.setPosition(SWORD_MOUTH_X, 0).setRotation(SWORD_REST_ANGLE),
+      })
     } else if (attack === 'dash') {
       const power = event.power ?? 0
-      this.headRig.setX(-9)
-      this.sword.setX(SWORD_MOUTH_X - 7).setScale(1.22 + power * 0.22, 0.82)
-      this.swordTrails[2].setRotation(0).setAlpha(0.58).setScale(1.65 + power * 0.55, 0.65)
-      this.tweens.add({ targets: this.headRig, x: 22, duration: 72, yoyo: true, ease: 'Expo.Out' })
-      this.tweens.add({ targets: this.sword, x: SWORD_MOUTH_X + 38, duration: 72, yoyo: true, ease: 'Expo.Out' })
+      this.headRig.setX(-8)
+      this.sword.setScale(1.18 + power * 0.18, 0.86)
+      this.swordTrails[2].setRotation(-0.34).setAlpha(0.58).setScale(1.55 + power * 0.48, 0.62)
+      this.tweens.add({ targets: this.headRig, x: 20, duration: 70, yoyo: true, ease: 'Expo.Out' })
+      this.tweens.add({
+        targets: this.sword,
+        x: SWORD_MOUTH_X + 28,
+        rotation: -0.34,
+        duration: 70,
+        yoyo: true,
+        ease: 'Expo.Out',
+        onComplete: () => this.sword.setPosition(SWORD_MOUTH_X, 0).setRotation(SWORD_REST_ANGLE),
+      })
     } else if (attack === 'whirlwind') {
-      this.sword.setScale(1.12, 1.28)
+      this.sword.setScale(1.1, 1.22)
       for (let i = 0; i < this.swordTrails.length; i += 1) {
         this.swordTrails[i]
-          .setRotation((i / this.swordTrails.length) * Math.PI * 2)
-          .setAlpha(0.28)
-          .setScale(1.12, 1.24)
+          .setRotation(SWORD_REST_ANGLE + (i / this.swordTrails.length) * Math.PI * 2)
+          .setAlpha(0.3)
+          .setScale(1.1, 1.2)
       }
       this.tweens.add({
         targets: this.headRig,
         rotation: Math.PI * 2.15,
-        duration: 305,
+        duration: 300,
         ease: 'Cubic.Out',
         onComplete: () => this.headRig.setRotation(0),
       })
     }
 
-    this.tweens.add({ targets: this.sword, scaleY: 1, duration: attack === 'whirlwind' ? 260 : 120, ease: 'Quad.Out' })
+    this.tweens.add({ targets: this.sword, scaleY: 1.04, duration: attack === 'whirlwind' ? 255 : 118, ease: 'Quad.Out' })
     for (const trail of this.swordTrails) {
-      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: attack === 'whirlwind' ? 300 : 180, ease: 'Quad.Out' })
+      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: attack === 'whirlwind' ? 295 : 175, ease: 'Quad.Out' })
     }
   }
 
