@@ -16,7 +16,7 @@ export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
     arcRadians: Math.PI * 0.95,
     damage: 1,
     knockback: 26,
-    cooldownTicks: 22,
+    cooldownTicks: 14,
   },
   stab: {
     innerRadius: 18,
@@ -24,7 +24,7 @@ export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
     arcRadians: Math.PI * 0.16,
     damage: 2,
     knockback: 34,
-    cooldownTicks: 28,
+    cooldownTicks: 18,
   },
   dash: {
     innerRadius: 0,
@@ -32,7 +32,7 @@ export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
     arcRadians: Math.PI * 0.24,
     damage: 2,
     knockback: 52,
-    cooldownTicks: 48,
+    cooldownTicks: 38,
   },
   whirlwind: {
     innerRadius: 0,
@@ -40,7 +40,7 @@ export const SWORD_ATTACKS: Record<AttackKind, SwordConfig> = {
     arcRadians: Math.PI * 2,
     damage: 1,
     knockback: 32,
-    cooldownTicks: 78,
+    cooldownTicks: 58,
   },
 }
 
