@@ -5,6 +5,7 @@ on:
     branches: [pivot/openrealm-wasm-spike-v0]
     paths:
       - .github/workflows/publish-openrealm-githack.yml
+      - spike/wasm/**
 
 concurrency:
   group: publish-openrealm-githack-v0
@@ -44,6 +45,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_init_trace.py
           python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
           python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
+          python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
           git diff --check
 
       - name: Build OpenRealm wasm
@@ -67,7 +69,7 @@ jobs:
           done
           chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           test -n "$chrome"
-          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 pngjs@7.0.0
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html timeout 90s node spike/wasm/browser_smoke.mjs
 
       - name: Publish static GitHack branch
@@ -87,7 +89,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git reset --hard HEAD
-          git clean -fdx
+          git clean -ffdx
           git switch --orphan githack-openrealm-wasm-spike-v0
           cp -a /tmp/openrealm-githack/. .
           git add -A
