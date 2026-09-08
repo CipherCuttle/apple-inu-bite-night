@@ -18,4 +18,4 @@ describe('GoreBudget', () => {
     expect(selected.major).toHaveLength(3)
     expect(selected.minor).toHaveLength(5)
   })
-}
+})
