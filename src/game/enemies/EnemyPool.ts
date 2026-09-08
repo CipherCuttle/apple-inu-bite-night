@@ -1,6 +1,8 @@
 import type { XorShift32 } from '../sim/RNG'
 import type { EnemyState } from './Enemy'
 
+export const ACTIVE_ENEMY_CAP = 48
+
 export class EnemyPool {
   readonly items: EnemyState[]
   private nextId = 1
@@ -30,12 +32,13 @@ export class EnemyPool {
   }
 
   spawnAround(playerX: number, playerY: number, rng: XorShift32, radiusMin = 300, radiusMax = 480): EnemyState | null {
+    if (this.activeCount() >= ACTIVE_ENEMY_CAP) return null
     const enemy = this.items.find((item) => !item.active)
     if (!enemy) return null
 
     const angle = rng.range(-Math.PI, Math.PI)
     const radius = rng.range(radiusMin, radiusMax)
-    const heavy = rng.next() < 0.22
+    const heavy = rng.next() < 0.32
     enemy.id = this.nextId++
     enemy.active = true
     enemy.x = playerX + Math.cos(angle) * radius
