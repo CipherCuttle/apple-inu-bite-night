@@ -11,3 +11,8 @@ Only a tiny curated CC0 subset is imported: three Reactorcore meat gibs and two 
 
 ## Reproducibility
 Archive SHA-256 values are frozen in `licenses/ASSET_MANIFEST.json`. `scripts/audit-asset-inbox.mjs` can check locally staged source archives. Derived production files have per-file SHA-256 entries under `assets[]`.
+
+## Verification receipt
+Identity migration source commit: `21a7c3ebf2b5c2d61dd673d4d5cec0155a7aaf19`.
+
+The import migration verified the exact archive hashes, generated the canonical subset, then passed frozen install, lint, TypeScript, the full Vitest suite, production build, and the determinism regression before committing. This documentation commit intentionally triggers the normal repository CI and preview publishers against the resulting runtime.
