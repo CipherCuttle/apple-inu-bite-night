@@ -49,7 +49,9 @@ jobs:
           git diff --stat
 
       - name: Compile and link actual OpenRealm engine
-        run: bash spike/wasm/build_openrealm_wasm.sh open-realm
+        run: |
+          python3 spike/wasm/patch_menu_object_isolation.py
+          bash spike/wasm/build_openrealm_wasm.sh open-realm
 
       - name: Boot OpenRealm SDL WebGL2 in Chromium
         run: |
