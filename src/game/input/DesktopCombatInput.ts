@@ -15,12 +15,14 @@ export interface RectLike {
 export interface DesktopPointerSnapshot extends LogicalPoint {
   active: boolean
   leftClicks: number
-  rightClicks: number
+  rightPresses: number
+  rightReleases: number
+  rightHeld: boolean
 }
 
 export function buttonToAttack(button: number): AttackKind | null {
   if (button === 0) return 'slash'
-  if (button === 2) return 'stab'
+  if (button === 2) return 'dash'
   return null
 }
 
@@ -48,9 +50,11 @@ export class DesktopCombatInput {
   private pointerY: number
   private active = false
   private queuedSlash = false
-  private queuedStab = false
+  private queuedDashRelease = false
+  private rightHeld = false
   private leftClicks = 0
-  private rightClicks = 0
+  private rightPresses = 0
+  private rightReleases = 0
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -67,6 +71,8 @@ export class DesktopCombatInput {
 
     canvas.addEventListener('pointermove', this.handlePointerMove)
     canvas.addEventListener('pointerdown', this.handlePointerDown)
+    canvas.addEventListener('pointerup', this.handlePointerUp)
+    canvas.addEventListener('pointercancel', this.handlePointerCancel)
     canvas.addEventListener('contextmenu', this.handleContextMenu)
   }
 
@@ -76,20 +82,24 @@ export class DesktopCombatInput {
       x: this.pointerX,
       y: this.pointerY,
       leftClicks: this.leftClicks,
-      rightClicks: this.rightClicks,
+      rightPresses: this.rightPresses,
+      rightReleases: this.rightReleases,
+      rightHeld: this.rightHeld,
     }
   }
 
-  consumeAttacks(): { slash: boolean; stab: boolean } {
-    const attacks = { slash: this.queuedSlash, stab: this.queuedStab }
+  consumeAttacks(): { slash: boolean; dashReleased: boolean } {
+    const attacks = { slash: this.queuedSlash, dashReleased: this.queuedDashRelease }
     this.queuedSlash = false
-    this.queuedStab = false
+    this.queuedDashRelease = false
     return attacks
   }
 
   destroy(): void {
     this.canvas.removeEventListener('pointermove', this.handlePointerMove)
     this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
+    this.canvas.removeEventListener('pointerup', this.handlePointerUp)
+    this.canvas.removeEventListener('pointercancel', this.handlePointerCancel)
     this.canvas.removeEventListener('contextmenu', this.handleContextMenu)
   }
 
@@ -121,11 +131,42 @@ export class DesktopCombatInput {
     if (attack === 'slash') {
       this.queuedSlash = true
       this.leftClicks += 1
-    } else if (attack === 'stab') {
-      event.preventDefault()
-      this.queuedStab = true
-      this.rightClicks += 1
+      return
     }
+
+    if (attack === 'dash') {
+      event.preventDefault()
+      this.rightHeld = true
+      this.rightPresses += 1
+      try {
+        this.canvas.setPointerCapture(event.pointerId)
+      } catch {
+        // Pointer capture is an enhancement; the combat contract still works without it.
+      }
+    }
+  }
+
+  private readonly handlePointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch' || event.button !== 2) return
+    event.preventDefault()
+    this.active = true
+    this.updatePointer(event)
+    if (this.rightHeld) {
+      this.rightHeld = false
+      this.queuedDashRelease = true
+      this.rightReleases += 1
+    }
+    try {
+      if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId)
+    } catch {
+      // Ignore browsers that do not expose pointer capture consistently.
+    }
+  }
+
+  private readonly handlePointerCancel = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') return
+    this.rightHeld = false
+    this.queuedDashRelease = false
   }
 
   private readonly handleContextMenu = (event: MouseEvent): void => {
