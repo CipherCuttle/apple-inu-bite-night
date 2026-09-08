@@ -20,4 +20,9 @@ describe('sword sectors', () => {
     expect(isPointInSwordArc(0, 0, 0, 116, 0, 8, SWORD_ATTACKS.stab)).toBe(true)
     expect(isPointInSwordArc(0, 0, 0, 75, 48, 8, SWORD_ATTACKS.stab)).toBe(false)
   })
+
+  it('keeps primary melee recovery below a quarter second at 60 Hz', () => {
+    expect(SWORD_ATTACKS.slash.cooldownTicks).toBeLessThanOrEqual(15)
+    expect(SWORD_ATTACKS.stab.cooldownTicks).toBeLessThanOrEqual(18)
+  })
 })
