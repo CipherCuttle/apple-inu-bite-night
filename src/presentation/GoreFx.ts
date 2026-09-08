@@ -24,10 +24,11 @@ interface Decal {
 }
 
 const FRAME_MS = 1000 / 60
-const DECAL_LIFE_MS = 26000
+const DECAL_LIFE_MS = 30000
+const LIMB_TEXTURES = ['zombie-arm', 'zombie-leg'] as const
 
 export class GoreFx {
-  private readonly budget = new GoreBudget()
+  private readonly budget = new GoreBudget(5, 12)
   private readonly droplets: Droplet[] = []
   private readonly gibs: Gib[] = []
   private readonly decals: Decal[] = []
@@ -43,12 +44,12 @@ export class GoreFx {
       this.droplets.push({ sprite, vx: 0, vy: 0, lifeMs: 0 })
     }
 
-    for (let i = 0; i < 48; i += 1) {
-      const sprite = scene.add.image(-9999, -9999, i % 4 === 0 ? 'bone-gib' : 'meat-gib').setVisible(false).setDepth(8)
+    for (let i = 0; i < 96; i += 1) {
+      const sprite = scene.add.image(-9999, -9999, 'meat-gib').setVisible(false).setDepth(8)
       this.gibs.push({ sprite, vx: 0, vy: 0, spin: 0, lifeMs: 0 })
     }
 
-    for (let i = 0; i < 72; i += 1) {
+    for (let i = 0; i < 84; i += 1) {
       const sprite = scene.add.image(-9999, -9999, `blood-splat-${i % 3}`).setVisible(false).setDepth(1)
       this.decals.push({ sprite, lifeMs: 0 })
     }
@@ -56,11 +57,19 @@ export class GoreFx {
 
   process(events: readonly SimEvent[], cameraX: number, cameraY: number): void {
     const frame = this.budget.select(events)
-    for (const hit of frame.minor) this.spawnSpray(hit, 2, cameraX, cameraY)
+    for (const hit of frame.minor) {
+      this.spawnSpray(hit, 4, cameraX, cameraY)
+      if (hit.attack === 'slash' || hit.attack === 'whirlwind') {
+        this.spawnDismemberment(hit, 1, cameraX, cameraY, false)
+        this.spawnDecal(hit, cameraX, cameraY, 0.5)
+      }
+    }
     for (const hit of frame.major) {
-      this.spawnSpray(hit, 7, cameraX, cameraY)
-      this.spawnGibs(hit, cameraX, cameraY)
-      this.spawnDecal(hit, cameraX, cameraY)
+      this.spawnSpray(hit, hit.attack === 'whirlwind' ? 13 : 10, cameraX, cameraY)
+      const limbCount = hit.attack === 'slash' || hit.attack === 'whirlwind' ? 4 : hit.attack === 'dash' ? 3 : 2
+      this.spawnDismemberment(hit, limbCount, cameraX, cameraY, true)
+      this.spawnMeatBits(hit, hit.attack === 'stab' ? 2 : 3, cameraX, cameraY)
+      this.spawnDecal(hit, cameraX, cameraY, 1)
     }
   }
 
@@ -86,7 +95,7 @@ export class GoreFx {
       gib.sprite.x += gib.vx * frameScale
       gib.sprite.y += gib.vy * frameScale
       gib.sprite.rotation += gib.spin * frameScale
-      gib.sprite.alpha = Math.min(1, gib.lifeMs / 450)
+      gib.sprite.alpha = Math.min(1, gib.lifeMs / 650)
       if (gib.lifeMs <= 0) gib.sprite.setVisible(false)
     }
 
@@ -119,32 +128,59 @@ export class GoreFx {
       const droplet = this.droplets[this.dropletCursor]
       this.dropletCursor = (this.dropletCursor + 1) % this.droplets.length
       const angle = hit.facing + rng.range(-0.95, 0.95)
-      const speed = rng.range(2.4, 7.2)
+      const speed = rng.range(3, 8.4)
       droplet.vx = Math.cos(angle) * speed
       droplet.vy = Math.sin(angle) * speed
-      droplet.lifeMs = rng.int(250, 520)
+      droplet.lifeMs = rng.int(280, 600)
       droplet.sprite
         .setPosition(hit.x + cameraX, hit.y + cameraY)
-        .setScale(rng.range(0.8, 2.2))
+        .setScale(rng.range(0.9, 2.5))
         .setAlpha(1)
         .setVisible(true)
     }
   }
 
-  private spawnGibs(hit: Extract<SimEvent, { type: 'enemy-hit' }>, cameraX: number, cameraY: number): void {
-    const rng = new XorShift32((hit.enemyId * 0x85ebca6b) ^ (hit.tick * 31))
-    const count = rng.int(1, 3)
+  private spawnDismemberment(
+    hit: Extract<SimEvent, { type: 'enemy-hit' }>,
+    count: number,
+    cameraX: number,
+    cameraY: number,
+    includeHead: boolean,
+  ): void {
+    const rng = new XorShift32((hit.enemyId * 0x85ebca6b) ^ (hit.tick * 31) ^ 0x51a5)
     for (let i = 0; i < count; i += 1) {
       const gib = this.gibs[this.gibCursor]
       this.gibCursor = (this.gibCursor + 1) % this.gibs.length
-      const angle = hit.facing + rng.range(-1.25, 1.25)
-      const speed = rng.range(2.2, 5.8)
+      const angle = hit.facing + rng.range(-1.05, 1.05)
+      const speed = rng.range(3.4, 8.2)
+      const texture = includeHead && i === 0 ? 'zombie-head' : LIMB_TEXTURES[(i + rng.int(0, 1)) % LIMB_TEXTURES.length]
       gib.vx = Math.cos(angle) * speed
       gib.vy = Math.sin(angle) * speed
-      gib.spin = rng.range(-0.28, 0.28)
-      gib.lifeMs = rng.int(1000, 2100)
+      gib.spin = rng.range(-0.34, 0.34)
+      gib.lifeMs = rng.int(includeHead ? 6500 : 4200, includeHead ? 11000 : 7600)
       gib.sprite
-        .setTexture(rng.next() < 0.18 ? 'bone-gib' : 'meat-gib')
+        .setTexture(texture)
+        .setPosition(hit.x + cameraX + rng.range(-4, 4), hit.y + cameraY + rng.range(-4, 4))
+        .setScale(rng.range(0.85, 1.25))
+        .setRotation(rng.range(-Math.PI, Math.PI))
+        .setAlpha(1)
+        .setVisible(true)
+    }
+  }
+
+  private spawnMeatBits(hit: Extract<SimEvent, { type: 'enemy-hit' }>, count: number, cameraX: number, cameraY: number): void {
+    const rng = new XorShift32((hit.enemyId * 0x27d4eb2d) ^ (hit.tick * 17))
+    for (let i = 0; i < count; i += 1) {
+      const gib = this.gibs[this.gibCursor]
+      this.gibCursor = (this.gibCursor + 1) % this.gibs.length
+      const angle = hit.facing + rng.range(-1.35, 1.35)
+      const speed = rng.range(2.5, 6.2)
+      gib.vx = Math.cos(angle) * speed
+      gib.vy = Math.sin(angle) * speed
+      gib.spin = rng.range(-0.3, 0.3)
+      gib.lifeMs = rng.int(2200, 4800)
+      gib.sprite
+        .setTexture(rng.next() < 0.22 ? 'bone-gib' : 'meat-gib')
         .setPosition(hit.x + cameraX, hit.y + cameraY)
         .setScale(rng.range(0.75, 1.35))
         .setRotation(rng.range(-Math.PI, Math.PI))
@@ -153,7 +189,7 @@ export class GoreFx {
     }
   }
 
-  private spawnDecal(hit: Extract<SimEvent, { type: 'enemy-hit' }>, cameraX: number, cameraY: number): void {
+  private spawnDecal(hit: Extract<SimEvent, { type: 'enemy-hit' }>, cameraX: number, cameraY: number, scaleMultiplier: number): void {
     const rng = new XorShift32((hit.enemyId * 0xc2b2ae35) ^ hit.tick)
     const decal = this.decals[this.decalCursor]
     this.decalCursor = (this.decalCursor + 1) % this.decals.length
@@ -161,7 +197,7 @@ export class GoreFx {
     decal.sprite
       .setTexture(`blood-splat-${rng.int(0, 2)}`)
       .setPosition(hit.x + cameraX + rng.range(-5, 5), hit.y + cameraY + rng.range(-5, 5))
-      .setScale(rng.range(0.7, 1.45))
+      .setScale(rng.range(0.7, 1.45) * scaleMultiplier)
       .setRotation(rng.range(-Math.PI, Math.PI))
       .setAlpha(0.78)
       .setVisible(true)
@@ -200,6 +236,33 @@ export class GoreFx {
     graphics.fillCircle(4, 6, 3)
     graphics.fillCircle(14, 6, 3)
     graphics.generateTexture('bone-gib', 18, 12)
+    graphics.clear()
+
+    graphics.fillStyle(0x607e4b, 1)
+    graphics.fillRect(3, 4, 17, 7)
+    graphics.fillStyle(0x8f1a2d, 1)
+    graphics.fillCircle(3, 7, 3)
+    graphics.generateTexture('zombie-arm', 22, 14)
+    graphics.clear()
+
+    graphics.fillStyle(0x526f43, 1)
+    graphics.fillRect(4, 3, 9, 22)
+    graphics.fillStyle(0x8f1a2d, 1)
+    graphics.fillCircle(8, 3, 3)
+    graphics.fillStyle(0x283722, 1)
+    graphics.fillRect(2, 22, 13, 5)
+    graphics.generateTexture('zombie-leg', 17, 28)
+    graphics.clear()
+
+    graphics.fillStyle(0x627f4a, 1)
+    graphics.fillCircle(12, 12, 10)
+    graphics.fillStyle(0x27351f, 1)
+    graphics.fillRect(2, 4, 9, 4)
+    graphics.fillStyle(0xa3bd62, 1)
+    graphics.fillCircle(16, 9, 2)
+    graphics.fillStyle(0x8f1a2d, 1)
+    graphics.fillCircle(5, 18, 4)
+    graphics.generateTexture('zombie-head', 24, 24)
     graphics.destroy()
   }
 }
