@@ -2,7 +2,6 @@ import { isPointInSwordArc, normalizeAngle, swordForAttack, type AttackKind } fr
 import { EnemyPool } from '../enemies/EnemyPool'
 import type { EnemyState } from '../enemies/Enemy'
 import { createImpactProps, type PropMaterial, type PropState } from '../world/Props'
-import { CITY_LEVEL_OBSTACLES, circleOverlapsObstacle, pointInsideExpandedObstacle } from '../world/Level'
 import { XorShift32 } from './RNG'
 
 export type PowerupKind = 'last-bite'
@@ -336,9 +335,9 @@ export class GameState {
     const flowMoveBoost = this.comboMultiplier() >= 3 ? 1.03 : 1
     const speed = PLAYER_SPEED * chargeSlowdown * flowMoveBoost
     const nextX = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-    if (!this.playerOverlapsProp(nextX, this.player.y) && !this.playerOverlapsLevel(nextX, this.player.y)) this.player.x = nextX
+    if (!this.playerOverlapsProp(nextX, this.player.y)) this.player.x = nextX
     const nextY = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
-    if (!this.playerOverlapsProp(this.player.x, nextY) && !this.playerOverlapsLevel(this.player.x, nextY)) this.player.y = nextY
+    if (!this.playerOverlapsProp(this.player.x, nextY)) this.player.y = nextY
   }
 
   private updateEnemies(): void {
@@ -359,7 +358,6 @@ export class GameState {
       enemy.y += enemy.vy
 
       this.resolveEnemyArenaWall(enemy)
-      this.resolveEnemyLevelObstacles(enemy)
       if (!enemy.active) continue
 
       enemy.impulseX *= IMPULSE_DRAG
@@ -562,13 +560,6 @@ export class GameState {
     let endX = clamp(startX + dash.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
     let endY = clamp(startY + dash.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
     let blocked = false
-    for (const obstacle of CITY_LEVEL_OBSTACLES) {
-      if (!segmentIntersectsExpandedObstacle(startX, startY, endX, endY, PLAYER_RADIUS, obstacle)) continue
-      blocked = true
-      endX = startX
-      endY = startY
-      break
-    }
     const dashForce = 12 + dash.power * 22
 
     for (const prop of this.props) {
@@ -716,7 +707,6 @@ export class GameState {
     const angle = normalizeAngle(this.player.facing + Math.PI * 0.5)
     let x = clamp(this.player.x + Math.cos(angle) * 54, -ARENA_BOUNDS.halfWidth + 24, ARENA_BOUNDS.halfWidth - 24)
     let y = clamp(this.player.y + Math.sin(angle) * 54, -ARENA_BOUNDS.halfHeight + 24, ARENA_BOUNDS.halfHeight - 24)
-    if (this.playerOverlapsLevel(x, y)) { x = this.player.x; y = this.player.y }
     const powerup: PowerupState = { id: this.nextPowerupId++, kind: 'last-bite', x, y, active: true, ttlTicks: LAST_BITE_TTL_TICKS }
     this.powerups.push(powerup)
     this.events.push({ type: 'last-chance', tick: this.tick, powerupId: powerup.id, x, y })
@@ -767,29 +757,6 @@ export class GameState {
     return false
   }
 
-  private playerOverlapsLevel(x: number, y: number): boolean {
-    return CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(x, y, PLAYER_RADIUS, obstacle))
-  }
-
-  private resolveEnemyLevelObstacles(enemy: EnemyState): void {
-    for (const obstacle of CITY_LEVEL_OBSTACLES) {
-      if (!circleOverlapsObstacle(enemy.x, enemy.y, enemy.radius, obstacle)) continue
-      const left = obstacle.x - obstacle.width / 2 - enemy.radius
-      const right = obstacle.x + obstacle.width / 2 + enemy.radius
-      const top = obstacle.y - obstacle.height / 2 - enemy.radius
-      const bottom = obstacle.y + obstacle.height / 2 + enemy.radius
-      const distances = [
-        { axis: 'x' as const, value: left, d: Math.abs(enemy.x - left) },
-        { axis: 'x' as const, value: right, d: Math.abs(enemy.x - right) },
-        { axis: 'y' as const, value: top, d: Math.abs(enemy.y - top) },
-        { axis: 'y' as const, value: bottom, d: Math.abs(enemy.y - bottom) },
-      ].sort((a, b) => a.d - b.d)
-      const escape = distances[0]
-      if (escape.axis === 'x') { enemy.x = escape.value; enemy.impulseX *= -0.18 } else { enemy.y = escape.value; enemy.impulseY *= -0.18 }
-      enemy.staggerTicks = Math.max(enemy.staggerTicks, 2)
-    }
-  }
-
   private resolveEnemyContact(): void {
     if (this.player.invulnerableTicks > 0 || this.dashState) return
 
@@ -812,7 +779,6 @@ export class GameState {
     while (this.enemies.activeCount() < TARGET_ENEMIES) {
       const enemy = this.enemies.spawnAround(this.player.x, this.player.y, this.rng)
       if (!enemy) break
-      if (CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(enemy.x, enemy.y, enemy.radius, obstacle))) { this.enemies.kill(enemy); continue }
     }
   }
 }
@@ -828,15 +794,6 @@ function distanceSqPointToSegment(px: number, py: number, ax: number, ay: number
   const dx = px - (ax + abx * t)
   const dy = py - (ay + aby * t)
   return dx * dx + dy * dy
-}
-
-function segmentIntersectsExpandedObstacle(ax: number, ay: number, bx: number, by: number, radius: number, obstacle: { id: number; x: number; y: number; width: number; height: number }): boolean {
-  const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 8))
-  for (let i = 1; i <= steps; i += 1) {
-    const t = i / steps
-    if (pointInsideExpandedObstacle(ax + (bx - ax) * t, ay + (by - ay) * t, radius, obstacle)) return true
-  }
-  return false
 }
 
 function clamp(value: number, min: number, max: number): number {
