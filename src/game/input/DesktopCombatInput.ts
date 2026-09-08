@@ -41,6 +41,9 @@ export function toLogicalPointer(
   }
 }
 
+const SLASH_BUFFER_TICKS = 8
+const DASH_RELEASE_BUFFER_TICKS = 12
+
 export class DesktopCombatInput {
   private readonly canvas: HTMLCanvasElement
   private readonly logicalWidth: number
@@ -49,8 +52,8 @@ export class DesktopCombatInput {
   private pointerX: number
   private pointerY: number
   private active = false
-  private queuedSlash = false
-  private queuedDashRelease = false
+  private queuedSlashTicks = 0
+  private queuedDashReleaseTicks = 0
   private rightHeld = false
   private leftClicks = 0
   private rightPresses = 0
@@ -89,10 +92,18 @@ export class DesktopCombatInput {
   }
 
   consumeAttacks(): { slash: boolean; dashReleased: boolean } {
-    const attacks = { slash: this.queuedSlash, dashReleased: this.queuedDashRelease }
-    this.queuedSlash = false
-    this.queuedDashRelease = false
+    const attacks = {
+      slash: this.queuedSlashTicks > 0,
+      dashReleased: this.queuedDashReleaseTicks > 0,
+    }
+    if (this.queuedSlashTicks > 0) this.queuedSlashTicks -= 1
+    if (this.queuedDashReleaseTicks > 0) this.queuedDashReleaseTicks -= 1
     return attacks
+  }
+
+  clearAttackBuffers(): void {
+    this.queuedSlashTicks = 0
+    this.queuedDashReleaseTicks = 0
   }
 
   destroy(): void {
@@ -129,7 +140,7 @@ export class DesktopCombatInput {
 
     const attack = buttonToAttack(event.button)
     if (attack === 'slash') {
-      this.queuedSlash = true
+      this.queuedSlashTicks = SLASH_BUFFER_TICKS
       this.leftClicks += 1
       return
     }
@@ -153,7 +164,7 @@ export class DesktopCombatInput {
     this.updatePointer(event)
     if (this.rightHeld) {
       this.rightHeld = false
-      this.queuedDashRelease = true
+      this.queuedDashReleaseTicks = DASH_RELEASE_BUFFER_TICKS
       this.rightReleases += 1
     }
     try {
@@ -166,7 +177,7 @@ export class DesktopCombatInput {
   private readonly handlePointerCancel = (event: PointerEvent): void => {
     if (event.pointerType === 'touch') return
     this.rightHeld = false
-    this.queuedDashRelease = false
+    this.queuedDashReleaseTicks = 0
   }
 
   private readonly handleContextMenu = (event: MouseEvent): void => {
