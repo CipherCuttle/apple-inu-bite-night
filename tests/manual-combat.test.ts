@@ -7,10 +7,10 @@ describe('manual mouse-style combat contract', () => {
     state.player.hp = 999
 
     state.step({ x: 0, y: 0, aimRadians: 0 })
-    expect(state.events.some((event) => event.type === 'sword-attack')).toBe(false)
+    expect(state.events.some((event) => event.type === 'weapon-attack')).toBe(false)
 
     state.step({ x: 0, y: 0, aimRadians: 0, slash: true })
-    expect(state.events.some((event) => event.type === 'sword-attack' && event.attack === 'slash')).toBe(true)
+    expect(state.events.some((event) => event.type === 'weapon-attack' && event.attack === 'slash')).toBe(true)
   })
 
   it('aim is authoritative independently of movement direction', () => {

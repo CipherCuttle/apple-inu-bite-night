@@ -19,9 +19,9 @@ describe('special melee attacks', () => {
     expect(state.dashChargeRatio()).toBe(1)
     state.step({ x: 0, y: 0, aimRadians: 0, dashReleased: true })
 
-    const dash = state.events.find((event) => event.type === 'sword-attack' && event.attack === 'dash')
+    const dash = state.events.find((event) => event.type === 'weapon-attack' && event.attack === 'dash')
     expect(dash).toBeDefined()
-    expect(dash?.type === 'sword-attack' ? dash.distance : 0).toBeGreaterThan(180)
+    expect(dash?.type === 'weapon-attack' ? dash.distance : 0).toBeGreaterThan(180)
     expect(state.isDashing()).toBe(true)
     expect(state.player.x).toBeGreaterThan(0)
     expect(state.player.x).toBeLessThan(80)
@@ -47,7 +47,7 @@ describe('special melee attacks', () => {
 
     state.step({ x: 0, y: 0, aimRadians: 0, whirlwind: true })
 
-    expect(state.events.some((event) => event.type === 'sword-attack' && event.attack === 'whirlwind')).toBe(true)
+    expect(state.events.some((event) => event.type === 'weapon-attack' && event.attack === 'whirlwind')).toBe(true)
     expect(state.events.some((event) => event.type === 'enemy-hit' && event.attack === 'whirlwind' && event.enemyId === target.id)).toBe(true)
   })
 })

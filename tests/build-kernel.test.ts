@@ -5,6 +5,7 @@ import { DEFAULT_LOADOUT, loadoutFingerprint, validateLoadout } from '../src/gam
 import { createStamina } from '../src/game/build/Stamina'
 import { WEAPON_IDS, WEAPON_REGISTRY } from '../src/game/build/Weapon'
 import { SWORD_ATTACKS } from '../src/game/combat/Sword'
+import { GameState } from '../src/game/sim/GameState'
 
 describe('hero / weapon / ability kernel v0', () => {
   it('models Apple Inu as a hero definition with fixed identity and swappable loadout slots', () => {
@@ -57,6 +58,49 @@ describe('hero / weapon / ability kernel v0', () => {
     expect(stamina.current).toBe(stamina.max)
     expect(stamina.max).toBeGreaterThan(0)
     expect(stamina.regenDelayTicks).toBeGreaterThan(0)
+  })
+
+  it('routes authoritative attacks through the equipped weapon without a shop dependency', () => {
+    const mouth = new GameState(77, DEFAULT_LOADOUT)
+    const spear = new GameState(77, { ...DEFAULT_LOADOUT, weaponId: 'spear' })
+    mouth.player.hp = 999
+    spear.player.hp = 999
+
+    const mouthTarget = mouth.enemies.items.find((enemy) => enemy.active)
+    const spearTarget = spear.enemies.items.find((enemy) => enemy.active)
+    expect(mouthTarget).toBeDefined()
+    expect(spearTarget).toBeDefined()
+    if (!mouthTarget || !spearTarget) return
+
+    for (const [state, target] of [[mouth, mouthTarget], [spear, spearTarget]] as const) {
+      target.x = state.player.x + 160
+      target.y = state.player.y
+      target.speed = 0
+      target.hp = 5
+    }
+
+    mouth.step({ x: 0, y: 0, aimRadians: 0, stab: true })
+    spear.step({ x: 0, y: 0, aimRadians: 0, stab: true })
+
+    expect(mouth.events.some((event) => event.type === 'enemy-hit' && event.enemyId === mouthTarget.id)).toBe(false)
+    expect(spear.events.some((event) => event.type === 'enemy-hit' && event.enemyId === spearTarget.id)).toBe(true)
+    expect(spear.events.some((event) => event.type === 'weapon-attack' && event.weaponId === 'spear')).toBe(true)
+  })
+
+  it('makes loadout identity part of deterministic state hashing', () => {
+    const spearA = new GameState(99, { ...DEFAULT_LOADOUT, weaponId: 'spear' })
+    const spearB = new GameState(99, { ...DEFAULT_LOADOUT, weaponId: 'spear' })
+    const greatsword = new GameState(99, { ...DEFAULT_LOADOUT, weaponId: 'greatsword' })
+
+    for (let tick = 0; tick < 90; tick += 1) {
+      const input = { x: 0, y: 0, aimRadians: 0, stab: tick % 17 === 0 }
+      spearA.step(input)
+      spearB.step(input)
+      greatsword.step(input)
+    }
+
+    expect(spearA.resultHash()).toBe(spearB.resultHash())
+    expect(spearA.resultHash()).not.toBe(greatsword.resultHash())
   })
 
   it('validates loadouts and gives authoritative selections a stable fingerprint', () => {

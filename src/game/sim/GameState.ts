@@ -1,4 +1,7 @@
-import { isPointInSwordArc, normalizeAngle, swordForAttack, type AttackKind } from '../combat/Sword'
+import { isPointInSwordArc, normalizeAngle, type AttackKind } from '../combat/Sword'
+import { heroDefinition, type HeroDefinition } from '../build/Hero'
+import { DEFAULT_LOADOUT, loadoutFingerprint, validateLoadout, type Loadout } from '../build/Loadout'
+import { weaponAttackForInput, type WeaponId } from '../build/Weapon'
 import { StyleMeter, type StyleRank } from '../combat/StyleMeter'
 import { EnemyPool } from '../enemies/EnemyPool'
 import type { EnemyState } from '../enemies/Enemy'
@@ -40,7 +43,8 @@ export type PhysicsImpactKind = 'wall' | 'enemy' | 'prop'
 
 export type SimEvent =
   | {
-      type: 'sword-attack'
+      type: 'weapon-attack'
+      weaponId: WeaponId
       attack: AttackKind
       tick: number
       x: number
@@ -107,8 +111,6 @@ interface DashState {
   hitPropIds: number[]
 }
 
-const PLAYER_SPEED = 3.25
-const PLAYER_RADIUS = 14
 export const TARGET_ENEMIES = 20
 const DASH_MIN_DISTANCE = 48
 const DASH_MAX_BONUS_DISTANCE = 150
@@ -133,7 +135,6 @@ const LAST_CHANCE_INVULNERABLE_TICKS = 60
 const LAST_BITE_HEAL = 2
 const LAST_BITE_FRENZY_TICKS = 120
 const LAST_BITE_ATTACK_SPEED = 1.25
-const PLAYER_MAX_HP = 5
 
 export const ARENA_BOUNDS = {
   halfWidth: 430,
@@ -145,10 +146,12 @@ const MAZE_SPAWN_POINTS = openMazeCenters()
 export class GameState {
   readonly seed: number
   readonly rng: XorShift32
+  readonly loadout: Loadout
+  readonly hero: HeroDefinition
   readonly enemies = new EnemyPool(220)
   readonly props: PropState[] = createImpactProps()
   readonly style = new StyleMeter()
-  readonly player: PlayerState = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: PLAYER_MAX_HP, invulnerableTicks: 0 }
+  readonly player: PlayerState
   readonly events: SimEvent[] = []
   readonly powerups: PowerupState[] = []
   tick = 0
@@ -166,9 +169,12 @@ export class GameState {
   private dashChargeTicks = 0
   private dashState: DashState | null = null
 
-  constructor(seed: number) {
+  constructor(seed: number, loadout: Loadout = DEFAULT_LOADOUT) {
     this.seed = seed >>> 0
     this.rng = new XorShift32(seed)
+    this.loadout = validateLoadout(loadout)
+    this.hero = heroDefinition(this.loadout.heroId)
+    this.player = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: this.hero.baseStats.maxHp, invulnerableTicks: 0 }
     this.ensurePopulation()
   }
 
@@ -193,7 +199,7 @@ export class GameState {
     if (this.dashState) {
       this.advanceDash()
     } else {
-      this.trySwordAttack(input)
+      this.tryWeaponAttack(input)
       if (this.dashState) this.advanceDash()
     }
 
@@ -277,6 +283,8 @@ export class GameState {
     feed(this.nextAttackTick)
     feed(this.dashChargeTicks)
     feed(this.rng.snapshot())
+    const fingerprint = loadoutFingerprint(this.loadout)
+    for (let i = 0; i < fingerprint.length; i += 1) feed(fingerprint.charCodeAt(i))
 
     if (this.dashState) {
       feed(1)
@@ -356,11 +364,11 @@ export class GameState {
     const nx = input.x / Math.max(1, length)
     const ny = input.y / Math.max(1, length)
     const chargeSlowdown = input.dashHeld ? 0.55 : 1
-    const speed = PLAYER_SPEED * chargeSlowdown
+    const speed = this.hero.movementProfile.speed * chargeSlowdown
     const nextX = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-    if (!this.playerOverlapsProp(nextX, this.player.y) && mazeCanOccupy(nextX, this.player.y, PLAYER_RADIUS)) this.player.x = nextX
+    if (!this.playerOverlapsProp(nextX, this.player.y) && mazeCanOccupy(nextX, this.player.y, this.hero.movementProfile.collisionRadius)) this.player.x = nextX
     const nextY = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
-    if (!this.playerOverlapsProp(this.player.x, nextY) && mazeCanOccupy(this.player.x, nextY, PLAYER_RADIUS)) this.player.y = nextY
+    if (!this.playerOverlapsProp(this.player.x, nextY) && mazeCanOccupy(this.player.x, nextY, this.hero.movementProfile.collisionRadius)) this.player.y = nextY
   }
 
   private updateEnemies(): void {
@@ -530,7 +538,7 @@ export class GameState {
     }
   }
 
-  private trySwordAttack(input: InputState): void {
+  private tryWeaponAttack(input: InputState): void {
     if (input.dashReleased) {
       const chargeTicks = this.dashChargeTicks
       this.dashChargeTicks = 0
@@ -541,9 +549,9 @@ export class GameState {
     const attack: AttackKind | null = input.whirlwind ? 'whirlwind' : input.stab ? 'stab' : input.slash ? 'slash' : null
     if (!attack || input.dashHeld || this.tick < this.nextAttackTick) return
 
-    const config = swordForAttack(attack)
+    const config = weaponAttackForInput(this.loadout.weaponId, attack)
     this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)
-    this.events.push({ type: 'sword-attack', attack, tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
+    this.events.push({ type: 'weapon-attack', weaponId: this.loadout.weaponId, attack, tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
 
     for (const enemy of this.enemies.items) {
       if (!enemy.active) continue
@@ -563,7 +571,7 @@ export class GameState {
   }
 
   private beginDash(chargeTicks: number): void {
-    const config = swordForAttack('dash')
+    const config = weaponAttackForInput(this.loadout.weaponId, 'dash')
     const power = Math.min(1, Math.max(0, chargeTicks) / MAX_DASH_CHARGE_TICKS)
     const requestedDistance = DASH_MIN_DISTANCE + DASH_MAX_BONUS_DISTANCE * power
     const startX = this.player.x
@@ -587,7 +595,8 @@ export class GameState {
     }
 
     this.events.push({
-      type: 'sword-attack',
+      type: 'weapon-attack',
+      weaponId: this.loadout.weaponId,
       attack: 'dash',
       tick: this.tick,
       x: startX,
@@ -607,13 +616,13 @@ export class GameState {
     let endX = clamp(startX + dash.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
     let endY = clamp(startY + dash.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
     let blocked = false
-    if (!mazeCanOccupy(endX, endY, PLAYER_RADIUS)) { blocked = true; endX = startX; endY = startY }
+    if (!mazeCanOccupy(endX, endY, this.hero.movementProfile.collisionRadius)) { blocked = true; endX = startX; endY = startY }
     const dashForce = 12 + dash.power * 22
 
     for (const prop of this.props) {
       if (blocked) break
       if (!prop.active || dash.hitPropIds.includes(prop.id)) continue
-      const hitRadius = PLAYER_RADIUS + prop.radius
+      const hitRadius = this.hero.movementProfile.collisionRadius + prop.radius
       if (distanceSqPointToSegment(prop.x, prop.y, startX, startY, endX, endY) > hitRadius * hitRadius) continue
       dash.hitPropIds.push(prop.id)
       const damage = prop.material === 'glass' ? prop.hp : 1 + Math.floor(dash.power * 2)
@@ -632,7 +641,7 @@ export class GameState {
     this.events.push({ type: 'dash-step', tick: this.tick, x: endX, y: endY, facing: dash.facing, power: dash.power })
 
     if (!blocked) {
-      const config = swordForAttack('dash')
+      const config = weaponAttackForInput(this.loadout.weaponId, 'dash')
       const damage = config.damage + Math.floor(dash.power * 2)
       const knockback = config.knockback + dash.power * 38
       for (const enemy of this.enemies.items) {
@@ -773,7 +782,7 @@ export class GameState {
       const dy = powerup.y - this.player.y
       if (dx * dx + dy * dy > POWERUP_PICKUP_RADIUS * POWERUP_PICKUP_RADIUS) continue
       powerup.active = false
-      this.player.hp = Math.min(PLAYER_MAX_HP, this.player.hp + LAST_BITE_HEAL)
+      this.player.hp = Math.min(this.hero.baseStats.maxHp, this.player.hp + LAST_BITE_HEAL)
       this.lastBiteFrenzyTicks = LAST_BITE_FRENZY_TICKS
       this.events.push({ type: 'powerup-picked', tick: this.tick, powerupId: powerup.id, kind: powerup.kind })
     }
@@ -801,7 +810,7 @@ export class GameState {
       if (!prop.active) continue
       const dx = prop.x - x
       const dy = prop.y - y
-      const minDist = prop.radius + PLAYER_RADIUS
+      const minDist = prop.radius + this.hero.movementProfile.collisionRadius
       if (dx * dx + dy * dy < minDist * minDist) return true
     }
     return false
@@ -814,7 +823,7 @@ export class GameState {
       if (!enemy.active) continue
       const dx = enemy.x - this.player.x
       const dy = enemy.y - this.player.y
-      const minDist = enemy.radius + PLAYER_RADIUS
+      const minDist = enemy.radius + this.hero.movementProfile.collisionRadius
       if (dx * dx + dy * dy > minDist * minDist) continue
 
       this.player.hp -= 1
