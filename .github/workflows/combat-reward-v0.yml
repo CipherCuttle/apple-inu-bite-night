@@ -1,0 +1,44 @@
+name: combat-reward-v0
+
+on:
+  push:
+    branches:
+      - tmp/player-identity-v1
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp/player-identity-v1
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Apply combat reward patch
+        run: python scripts/patch-combat-reward-v0.py
+      - name: Remove one-shot tooling
+        run: rm scripts/patch-combat-reward-v0.py .github/workflows/combat-reward-v0.yml
+      - name: Verify
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+          pnpm test:determinism
+      - name: Commit verified pass
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/game/sim/GameState.ts src/game/scenes/GameScene.ts tests/combo-powerups.test.ts docs/COMBAT_REWARD_V0.md scripts/patch-combat-reward-v0.py .github/workflows/combat-reward-v0.yml
+          git commit -m 'feat: add combat chain multipliers and powerup drops'
+          git push origin HEAD:tmp/player-identity-v1
