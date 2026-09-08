@@ -1,0 +1,94 @@
+name: publish-openrealm-githack
+
+on:
+  push:
+    branches: [pivot/openrealm-wasm-spike-v0]
+    paths:
+      - .github/workflows/publish-openrealm-githack.yml
+
+concurrency:
+  group: publish-openrealm-githack-v0
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v10
+        with:
+          version: 6.0.9
+          no-cache: true
+
+      - name: Clone pinned OpenRealm
+        run: |
+          git clone https://github.com/corepunch/open-realm.git open-realm
+          git -C open-realm checkout cf12357883950c14abce8d636596952c3fc547bb
+          test "$(git -C open-realm rev-parse HEAD)" = "cf12357883950c14abce8d636596952c3fc547bb"
+
+      - name: Apply browser overlay
+        run: |
+          cd open-realm
+          python3 ../spike/wasm/patch_openrealm.py
+          python3 ../spike/wasm/patch_wasm32_save.py
+          python3 ../spike/wasm/patch_wasm_audio.py
+          python3 ../spike/wasm/patch_wasm_menu_abi.py
+          python3 ../spike/wasm/patch_wasm_init_trace.py
+          python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
+          python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
+          git diff --check
+
+      - name: Build OpenRealm wasm
+        run: |
+          python3 spike/wasm/patch_menu_object_isolation.py
+          bash spike/wasm/build_openrealm_wasm.sh open-realm
+          test -s open-realm/build-wasm/openrealm.html
+          test -s open-realm/build-wasm/openrealm.js
+          test -s open-realm/build-wasm/openrealm.wasm
+          test -s open-realm/build-wasm/openrealm.data
+
+      - name: Browser smoke before publish
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/openrealm-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/openrealm.html >/dev/null; then break; fi
+            sleep 0.25
+          done
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$chrome"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html timeout 90s node spike/wasm/browser_smoke.mjs
+
+      - name: Publish static GitHack branch
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/openrealm-githack
+          mkdir -p /tmp/openrealm-githack
+          cp open-realm/build-wasm/openrealm.html /tmp/openrealm-githack/index.html
+          cp open-realm/build-wasm/openrealm.js /tmp/openrealm-githack/openrealm.js
+          cp open-realm/build-wasm/openrealm.wasm /tmp/openrealm-githack/openrealm.wasm
+          cp open-realm/build-wasm/openrealm.data /tmp/openrealm-githack/openrealm.data
+          touch /tmp/openrealm-githack/.nojekyll
+          printf 'source_branch=pivot/openrealm-wasm-spike-v0\nsource_sha=%s\nopenrealm_sha=cf12357883950c14abce8d636596952c3fc547bb\n' "$SOURCE_SHA" > /tmp/openrealm-githack/BUILD.txt
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch --orphan githack-openrealm-wasm-spike-v0
+          git rm -rf .
+          cp -a /tmp/openrealm-githack/. .
+          git add -A
+          git commit -m "preview(openrealm): publish wasm GitHack build"
+          git push --force origin HEAD:refs/heads/githack-openrealm-wasm-spike-v0
