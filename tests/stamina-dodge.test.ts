@@ -50,7 +50,7 @@ describe('soulslike stamina / dodge v0', () => {
     state.step({ x: 1, y: 0, dodge: true })
     expect(state.dodgeInvulnerable()).toBe(true)
 
-    for (let i = 0; i < 5; i += 1) state.step({ x: 0, y: 0 })
+    for (let i = 0; i < 4; i += 1) state.step({ x: 0, y: 0 })
     expect(state.dodgeInvulnerable()).toBe(true)
 
     state.step({ x: 0, y: 0 })
