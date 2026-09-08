@@ -3,6 +3,7 @@ import { BASE_SWORD, type AttackKind } from '../combat/Sword'
 import { DesktopCombatInput } from '../input/DesktopCombatInput'
 import { ARENA_BOUNDS, GameState, type InputState, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
+import type { PropMaterial } from '../world/Props'
 import { GoreFx } from '../../presentation/GoreFx'
 import { getImpactProfile } from '../../presentation/CombatFeel'
 import { Sfx } from '../../presentation/Sfx'
@@ -29,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text
   private killText!: Phaser.GameObjects.Text
   private zombieSprites: Phaser.GameObjects.Image[] = []
+  private propSprites: Phaser.GameObjects.Container[] = []
   private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
   private dashKey!: Phaser.Input.Keyboard.Key
   private stabKey!: Phaser.Input.Keyboard.Key
@@ -45,6 +47,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.createPlaceholderTextures()
     this.createArena()
+    this.createPropRenderers()
     this.gore = new GoreFx(this)
     this.createPlayer()
     this.createEnemyRenderPool()
@@ -135,7 +138,7 @@ export class GameScene extends Phaser.Scene {
     let hitCount = 0
     let killCount = 0
     for (const event of events) {
-      if (event.type === 'enemy-hit') {
+      if (event.type === 'enemy-hit' || event.type === 'physics-impact') {
         hitCount += 1
         if (event.killed) killCount += 1
       }
@@ -152,6 +155,12 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'sword-attack') {
         this.animateSword(event)
         this.sfx.sword(event.attack)
+      }
+      if (event.type === 'dash-step') this.spawnDashAfterimage(event)
+      if (event.type === 'physics-impact') this.spawnPhysicsImpact(event)
+      if (event.type === 'prop-hit') {
+        if (event.broken) this.spawnPropBurst(event)
+        else this.cameras.main.shake(35, Math.min(0.0028, 0.0008 + event.force * 0.00008))
       }
       if (event.type === 'player-hit') {
         this.cameras.main.flash(90, 190, 18, 46, false)
@@ -176,13 +185,23 @@ export class GameScene extends Phaser.Scene {
         sprite.setVisible(false)
         continue
       }
-      const wobble = Math.sin((this.state.tick + enemy.id * 13) * 0.12) * 0.055
+      const impulseSpeed = Math.hypot(enemy.impulseX, enemy.impulseY)
+      const wobble = Math.sin((this.state.tick + enemy.id * 13) * 0.12) * (0.055 + Math.min(0.12, impulseSpeed * 0.012))
       sprite
         .setVisible(true)
         .setPosition(WORLD_CX + enemy.x, WORLD_CY + enemy.y)
         .setRotation(Math.atan2(enemy.vy, enemy.vx) + wobble)
         .setScale(enemy.radius / 12)
-        .setTint(enemy.id % 5 === 0 ? 0x8cae5a : enemy.id % 3 === 0 ? 0x6f8950 : 0x7b9954)
+        .setTint(enemy.mass > 1.35 ? 0xa28755 : enemy.id % 3 === 0 ? 0x6f8950 : 0x7b9954)
+    }
+
+    for (let i = 0; i < this.propSprites.length; i += 1) {
+      const sprite = this.propSprites[i]
+      const prop = this.state.props[i]
+      sprite
+        .setVisible(prop.active)
+        .setPosition(WORLD_CX + prop.x, WORLD_CY + prop.y)
+        .setAlpha(prop.active ? 0.65 + 0.35 * Math.max(0, prop.hp / prop.maxHp) : 0)
     }
   }
 
@@ -209,12 +228,13 @@ export class GameScene extends Phaser.Scene {
 
     const aimRadians = Math.atan2(pointer.y - playerY, pointer.x - playerX)
     const aimDegrees = Math.round((aimRadians * 180) / Math.PI)
+    const dashState = this.state.isDashing() ? `  •  DASH ${this.state.dashTicksRemaining()}t` : ''
 
     this.aimGuide.lineStyle(charge > 0 ? 2 : 1, 0xff4f8d, charge > 0 ? 0.72 : 0.34)
     this.aimGuide.lineBetween(playerX, playerY, pointer.x, pointer.y)
     this.crosshair.setVisible(true).setPosition(pointer.x, pointer.y)
     this.inputText.setText(
-      `INPUT: MOUSE ✓  AIM ${aimDegrees}°  LMB ${pointer.leftClicks}  RMB ${pointer.rightPresses}/${pointer.rightReleases}${charge > 0 ? `  CHARGE ${Math.round(charge * 100)}%` : ''}`,
+      `INPUT: MOUSE ✓  AIM ${aimDegrees}°  LMB ${pointer.leftClicks}  RMB ${pointer.rightPresses}/${pointer.rightReleases}${charge > 0 ? `  CHARGE ${Math.round(charge * 100)}%` : ''}${dashState}`,
     )
   }
 
@@ -239,6 +259,28 @@ export class GameScene extends Phaser.Scene {
       ARENA_BOUNDS.halfWidth * 2,
       ARENA_BOUNDS.halfHeight * 2,
     )
+  }
+
+  private createPropRenderers(): void {
+    const colors: Record<PropMaterial, number> = {
+      wood: 0x8c4f31,
+      glass: 0x55d8eb,
+      metal: 0x7c7f89,
+    }
+    const outlines: Record<PropMaterial, number> = {
+      wood: 0x32170f,
+      glass: 0xc1f5ff,
+      metal: 0x242630,
+    }
+
+    for (const prop of this.state.props) {
+      const alpha = prop.material === 'glass' ? 0.42 : 0.9
+      const shadow = this.add.ellipse(2, 5, prop.radius * 2.1, prop.radius * 1.35, 0x000000, 0.32)
+      const body = this.add.circle(0, 0, prop.radius, colors[prop.material], alpha).setStrokeStyle(2, outlines[prop.material], 0.95)
+      const slash = this.add.rectangle(0, 0, prop.radius * 1.15, 3, outlines[prop.material], 0.65).setRotation(prop.id * 0.61)
+      const container = this.add.container(WORLD_CX + prop.x, WORLD_CY + prop.y, [shadow, body, slash]).setDepth(3)
+      this.propSprites.push(container)
+    }
   }
 
   private createPlayer(): void {
@@ -306,27 +348,11 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
     } else if (attack === 'dash') {
       const power = event.power ?? 0
-      const distance = event.distance ?? 0
       this.headRig.setX(-9)
       this.sword.setX(BASE_SWORD.innerRadius - 7).setScale(1.22 + power * 0.22, 0.82)
       this.swordTrails[2].setRotation(0).setAlpha(0.58).setScale(1.65 + power * 0.55, 0.65)
       this.tweens.add({ targets: this.headRig, x: 22, duration: 72, yoyo: true, ease: 'Expo.Out' })
       this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 38, duration: 72, yoyo: true, ease: 'Expo.Out' })
-
-      if (distance > 1) {
-        const streak = this.add
-          .rectangle(
-            WORLD_CX + event.x + Math.cos(event.facing) * (distance / 2),
-            WORLD_CY + event.y + Math.sin(event.facing) * (distance / 2),
-            distance,
-            13 + power * 9,
-            0xff4f8d,
-            0.28 + power * 0.18,
-          )
-          .setRotation(event.facing)
-          .setDepth(4)
-        this.tweens.add({ targets: streak, alpha: 0, scaleY: 0.25, duration: 150, ease: 'Quad.Out', onComplete: () => streak.destroy() })
-      }
     } else if (attack === 'whirlwind') {
       this.sword.setScale(1.12, 1.28)
       for (let i = 0; i < this.swordTrails.length; i += 1) {
@@ -348,6 +374,49 @@ export class GameScene extends Phaser.Scene {
     for (const trail of this.swordTrails) {
       this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: attack === 'whirlwind' ? 300 : 180, ease: 'Quad.Out' })
     }
+  }
+
+  private spawnDashAfterimage(event: Extract<SimEvent, { type: 'dash-step' }>): void {
+    const body = this.add.ellipse(-4, 0, 42, 24, 0xff4f8d, 0.14)
+    const blade = this.add.rectangle(15, 0, 84, 5, 0xffb6cf, 0.2).setOrigin(0, 0.5)
+    const ghost = this.add
+      .container(WORLD_CX + event.x, WORLD_CY + event.y, [body, blade])
+      .setRotation(event.facing)
+      .setDepth(8)
+      .setAlpha(0.42 + event.power * 0.18)
+    this.tweens.add({ targets: ghost, alpha: 0, scaleX: 0.88, scaleY: 0.88, duration: 115, ease: 'Quad.Out', onComplete: () => ghost.destroy() })
+  }
+
+  private spawnPhysicsImpact(event: Extract<SimEvent, { type: 'physics-impact' }>): void {
+    const color = event.kind === 'wall' ? 0xffd37c : event.kind === 'enemy' ? 0xff4f8d : 0xa7e8ff
+    const ring = this.add.circle(WORLD_CX + event.x, WORLD_CY + event.y, 7, 0x000000, 0).setStrokeStyle(2, color, 0.75).setDepth(30)
+    this.tweens.add({ targets: ring, scale: 1.8 + Math.min(1.6, event.force * 0.08), alpha: 0, duration: 125, ease: 'Quad.Out', onComplete: () => ring.destroy() })
+    if (event.kind === 'wall') this.cameras.main.shake(55, Math.min(0.0045, 0.0012 + event.force * 0.00012))
+  }
+
+  private spawnPropBurst(event: Extract<SimEvent, { type: 'prop-hit' }>): void {
+    const color = event.material === 'glass' ? 0x8fefff : event.material === 'metal' ? 0xb8bac2 : 0xb76b3f
+    const count = event.material === 'glass' ? 10 : event.material === 'wood' ? 7 : 5
+    for (let i = 0; i < count; i += 1) {
+      const angle = (event.propId * 1.73 + i * 2.39) % (Math.PI * 2)
+      const distance = 18 + ((event.propId * 7 + i * 11) % 22)
+      const shard = this.add
+        .rectangle(WORLD_CX + event.x, WORLD_CY + event.y, event.material === 'glass' ? 4 : 6, event.material === 'glass' ? 2 : 4, color, 0.9)
+        .setRotation(angle)
+        .setDepth(28)
+      this.tweens.add({
+        targets: shard,
+        x: shard.x + Math.cos(angle) * distance,
+        y: shard.y + Math.sin(angle) * distance,
+        rotation: angle + 2.2,
+        alpha: 0,
+        duration: 230,
+        ease: 'Cubic.Out',
+        onComplete: () => shard.destroy(),
+      })
+    }
+    this.cameras.main.shake(70, event.material === 'glass' ? 0.0025 : 0.0035)
+    this.sfx.hit(event.material === 'metal' ? 'heavy' : 'light')
   }
 
   private createCrosshair(): void {
