@@ -33,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private aimGuide!: Phaser.GameObjects.Graphics
   private inputText!: Phaser.GameObjects.Text
   private hpText!: Phaser.GameObjects.Text
+  private staminaText!: Phaser.GameObjects.Text
+  private staminaGraphics!: Phaser.GameObjects.Graphics
   private timerText!: Phaser.GameObjects.Text
   private killText!: Phaser.GameObjects.Text
   private comboText!: Phaser.GameObjects.Text
@@ -106,6 +108,7 @@ export class GameScene extends Phaser.Scene {
     keyboard.on('keydown-SPACE', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueSlash() })
     keyboard.on('keydown-E', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueStab() })
     keyboard.on('keydown-Q', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueWhirlwind() })
+    keyboard.on('keydown-C', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueDodge() })
     keyboard.on('keyup-SHIFT', () => this.keyboardCombat.queueDashRelease())
     keyboard.on('keydown-R', () => this.restartRun())
 
@@ -145,6 +148,7 @@ export class GameScene extends Phaser.Scene {
       dashHeld,
       dashReleased: dashReleaseEdge && !dashHeld,
       whirlwind: keyAttacks.whirlwind,
+      dodge: keyAttacks.dodge,
     }
 
     if (pointer.active) {
@@ -179,6 +183,7 @@ export class GameScene extends Phaser.Scene {
         this.sfx.sword(event.attack)
       }
       if (event.type === 'dash-step') this.spawnDashAfterimage(event)
+      if (event.type === 'dodge-step') this.spawnDodgeAfterimage(event)
       if (event.type === 'physics-impact') this.spawnPhysicsImpact(event)
       if (event.type === 'prop-hit') {
         if (event.broken) this.spawnPropBurst(event)
@@ -204,8 +209,12 @@ export class GameScene extends Phaser.Scene {
   private syncRenderState(): void {
     this.player.setPosition(WORLD_CX + this.state.player.x, WORLD_CY + this.state.player.y)
     this.player.setRotation(this.state.player.facing)
-    this.player.setAlpha(this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3 ? 0.42 : 1)
+    this.player.setAlpha((this.state.dodgeInvulnerable() || (this.state.player.invulnerableTicks > 0 && this.state.tick % 6 < 3)) ? 0.42 : 1)
     this.hpText.setText(`HP ${'■'.repeat(Math.max(0, this.state.player.hp))}`)
+    this.staminaText.setText(`ST ${Math.floor(this.state.staminaCurrent())}/${this.state.staminaMax()}${this.state.isDodging() ? `  DODGE ${this.state.dodgeTicksRemaining()}t` : ''}`)
+    this.staminaGraphics.clear()
+    this.staminaGraphics.fillStyle(0x17131c, 0.92).fillRect(16, 52, 180, 7)
+    this.staminaGraphics.fillStyle(0xa8e66b, 0.96).fillRect(16, 52, 180 * this.state.staminaProgress(), 7)
     this.timerText.setText(`MAZE ${(this.state.tick / 60).toFixed(1)}s`)
     this.killText.setText(`KILLS ${this.state.kills}  •  SCORE ${this.state.score}`)
     const comboWindow = this.state.comboTimeRemaining()
@@ -545,6 +554,12 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: ghost, alpha: 0, scaleX: 0.88, scaleY: 0.88, duration: 115, ease: 'Quad.Out', onComplete: () => ghost.destroy() })
   }
 
+  private spawnDodgeAfterimage(event: Extract<SimEvent, { type: 'dodge-step' }>): void {
+    const body = this.add.ellipse(-4, 0, 28, 17, event.invulnerable ? 0xa8e66b : 0xd8d2c8, 0.12)
+    const ghost = this.add.container(WORLD_CX + event.x, WORLD_CY + event.y, [body]).setRotation(event.facing).setDepth(8).setAlpha(0.5)
+    this.tweens.add({ targets: ghost, alpha: 0, scaleX: 0.84, scaleY: 0.84, duration: 105, ease: 'Quad.Out', onComplete: () => ghost.destroy() })
+  }
+
   private spawnPhysicsImpact(event: Extract<SimEvent, { type: 'physics-impact' }>): void {
     const color = event.kind === 'wall' ? 0xffd37c : event.kind === 'enemy' ? 0xff4f8d : 0xa7e8ff
     const ring = this.add.circle(WORLD_CX + event.x, WORLD_CY + event.y, 7, 0x000000, 0).setStrokeStyle(2, color, 0.75).setDepth(30)
@@ -671,6 +686,8 @@ export class GameScene extends Phaser.Scene {
   private createHud(): void {
     const style: Phaser.Types.GameObjects.Text.TextStyle = { fontFamily: 'monospace', fontSize: '15px', color: '#f2e9ff' }
     this.hpText = this.add.text(16, 14, '', style).setDepth(100)
+    this.staminaText = this.add.text(16, 34, '', { ...style, fontSize: '12px', color: '#c8f58a' }).setDepth(100)
+    this.staminaGraphics = this.add.graphics().setDepth(99)
     this.timerText = this.add.text(480, 14, '', style).setOrigin(0.5, 0).setDepth(100)
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
     this.comboText = this.add.text(480, 38, 'CHAIN —', { ...style, fontSize: '14px', color: '#ff77a5' }).setOrigin(0.5, 0).setDepth(105)
@@ -681,7 +698,7 @@ export class GameScene extends Phaser.Scene {
     this.mazeStatusText = this.add.text(480, 82, '', { ...style, fontSize: '11px', color: '#d6b8d7' }).setOrigin(0.5, 0).setDepth(105)
     this.inputText = this.add.text(16, 478, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
     this.add
-      .text(16, 505, 'WASD MOVE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART', {
+      .text(16, 505, 'WASD MOVE • C DODGE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART', {
         ...style,
         fontSize: '11px',
         color: '#a998b6',
