@@ -86,6 +86,8 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git reset --hard HEAD
+          git clean -fdx
           git switch --orphan githack-openrealm-wasm-spike-v0
           git rm -rf .
           cp -a /tmp/openrealm-githack/. .
