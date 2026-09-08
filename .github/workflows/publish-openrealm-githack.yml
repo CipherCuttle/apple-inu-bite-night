@@ -89,7 +89,6 @@ jobs:
           git reset --hard HEAD
           git clean -fdx
           git switch --orphan githack-openrealm-wasm-spike-v0
-          git rm -rf .
           cp -a /tmp/openrealm-githack/. .
           git add -A
           git commit -m "preview(openrealm): publish wasm GitHack build"
