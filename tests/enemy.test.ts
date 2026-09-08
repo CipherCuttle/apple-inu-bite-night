@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EnemyPool } from '../src/game/enemies/EnemyPool'
+import { ACTIVE_ENEMY_CAP, EnemyPool } from '../src/game/enemies/EnemyPool'
 import { XorShift32 } from '../src/game/sim/RNG'
 
 describe('EnemyPool', () => {
@@ -14,5 +14,13 @@ describe('EnemyPool', () => {
     pool.kill(first!)
     expect(pool.spawnAround(0, 0, rng)).not.toBeNull()
     expect(pool.items).toHaveLength(2)
+  })
+
+  it('caps the live horde below the backing pool capacity', () => {
+    const pool = new EnemyPool(220)
+    const rng = new XorShift32(7)
+    for (let i = 0; i < ACTIVE_ENEMY_CAP + 20; i += 1) pool.spawnAround(0, 0, rng)
+    expect(pool.activeCount()).toBe(ACTIVE_ENEMY_CAP)
+    expect(ACTIVE_ENEMY_CAP).toBeLessThan(60)
   })
 })
