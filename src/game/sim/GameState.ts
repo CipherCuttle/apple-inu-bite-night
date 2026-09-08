@@ -46,6 +46,7 @@ export type SimEvent =
       y: number
       killed: boolean
       facing: number
+      severedPart?: 'left-arm' | 'right-arm'
     }
   | {
       type: 'physics-impact'
@@ -217,6 +218,7 @@ export class GameState {
       feed(enemy.impulseX)
       feed(enemy.impulseY)
       feed(enemy.staggerTicks)
+      feed(enemy.severedArm === 'left' ? 1 : enemy.severedArm === 'right' ? 2 : 0)
     }
 
     return hash.toString(16).padStart(8, '0')
@@ -523,6 +525,13 @@ export class GameState {
     const killed = enemy.hp <= 0
     const hitX = enemy.x
     const hitY = enemy.y
+    let severedPart: 'left-arm' | 'right-arm' | undefined
+
+    if (!killed && enemy.severedArm === 'none' && (attack === 'slash' || attack === 'whirlwind')) {
+      const side = ((enemy.id ^ this.tick) & 1) === 0 ? 'left' : 'right'
+      enemy.severedArm = side
+      severedPart = side === 'left' ? 'left-arm' : 'right-arm'
+    }
 
     if (killed) {
       this.kills += 1
@@ -543,6 +552,7 @@ export class GameState {
       y: hitY,
       killed,
       facing,
+      severedPart,
     })
   }
 

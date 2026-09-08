@@ -22,6 +22,7 @@ export class EnemyPool {
       impulseX: 0,
       impulseY: 0,
       staggerTicks: 0,
+      severedArm: 'none',
     }))
   }
 
@@ -52,6 +53,7 @@ export class EnemyPool {
     enemy.impulseX = 0
     enemy.impulseY = 0
     enemy.staggerTicks = 0
+    enemy.severedArm = 'none'
     return enemy
   }
 
@@ -62,5 +64,6 @@ export class EnemyPool {
     enemy.impulseX = 0
     enemy.impulseY = 0
     enemy.staggerTicks = 0
+    enemy.severedArm = 'none'
   }
 }

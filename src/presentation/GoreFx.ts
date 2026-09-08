@@ -25,7 +25,7 @@ interface Decal {
 
 const FRAME_MS = 1000 / 60
 const DECAL_LIFE_MS = 30000
-const LIMB_TEXTURES = ['zombie-arm', 'zombie-leg'] as const
+const LIMB_TEXTURES = ['zombie-part-arm-left', 'zombie-part-arm-right', 'zombie-part-leg-left', 'zombie-part-leg-right'] as const
 
 export class GoreFx {
   private readonly budget = new GoreBudget(5, 12)
@@ -45,12 +45,12 @@ export class GoreFx {
     }
 
     for (let i = 0; i < 96; i += 1) {
-      const sprite = scene.add.image(-9999, -9999, 'meat-gib').setVisible(false).setDepth(8)
+      const sprite = scene.add.image(-9999, -9999, 'gore-meat-1').setVisible(false).setDepth(8)
       this.gibs.push({ sprite, vx: 0, vy: 0, spin: 0, lifeMs: 0 })
     }
 
     for (let i = 0; i < 84; i += 1) {
-      const sprite = scene.add.image(-9999, -9999, `blood-splat-${i % 3}`).setVisible(false).setDepth(1)
+      const sprite = scene.add.image(-9999, -9999, i % 2 === 0 ? 'gore-blood-trail-2' : 'gore-blood-trail-4').setVisible(false).setDepth(1)
       this.decals.push({ sprite, lifeMs: 0 })
     }
   }
@@ -59,10 +59,8 @@ export class GoreFx {
     const frame = this.budget.select(events)
     for (const hit of frame.minor) {
       this.spawnSpray(hit, 4, cameraX, cameraY)
-      if (hit.attack === 'slash' || hit.attack === 'whirlwind') {
-        this.spawnDismemberment(hit, 1, cameraX, cameraY, false)
-        this.spawnDecal(hit, cameraX, cameraY, 0.5)
-      }
+      if (hit.severedPart) this.spawnSeveredPart(hit, cameraX, cameraY)
+      if (hit.attack === 'slash' || hit.attack === 'whirlwind') this.spawnDecal(hit, cameraX, cameraY, 0.5)
     }
     for (const hit of frame.major) {
       this.spawnSpray(hit, hit.attack === 'whirlwind' ? 13 : 10, cameraX, cameraY)
@@ -140,6 +138,30 @@ export class GoreFx {
     }
   }
 
+  private spawnSeveredPart(
+    hit: Extract<SimEvent, { type: 'enemy-hit' }>,
+    cameraX: number,
+    cameraY: number,
+  ): void {
+    const gib = this.gibs[this.gibCursor]
+    this.gibCursor = (this.gibCursor + 1) % this.gibs.length
+    const rng = new XorShift32((hit.enemyId * 0x7f4a7c15) ^ hit.tick)
+    const texture = hit.severedPart === 'left-arm' ? 'zombie-part-arm-left' : 'zombie-part-arm-right'
+    const angle = hit.facing + rng.range(-0.55, 0.55)
+    const speed = rng.range(5.2, 8.4)
+    gib.vx = Math.cos(angle) * speed
+    gib.vy = Math.sin(angle) * speed
+    gib.spin = rng.range(-0.38, 0.38)
+    gib.lifeMs = rng.int(6500, 10500)
+    gib.sprite
+      .setTexture(texture)
+      .setPosition(hit.x + cameraX, hit.y + cameraY)
+      .setScale(rng.range(0.8, 1.08))
+      .setRotation(rng.range(-Math.PI, Math.PI))
+      .setAlpha(1)
+      .setVisible(true)
+  }
+
   private spawnDismemberment(
     hit: Extract<SimEvent, { type: 'enemy-hit' }>,
     count: number,
@@ -153,7 +175,7 @@ export class GoreFx {
       this.gibCursor = (this.gibCursor + 1) % this.gibs.length
       const angle = hit.facing + rng.range(-1.05, 1.05)
       const speed = rng.range(3.4, 8.2)
-      const texture = includeHead && i === 0 ? 'zombie-head' : LIMB_TEXTURES[(i + rng.int(0, 1)) % LIMB_TEXTURES.length]
+      const texture = includeHead && i === 0 ? 'zombie-part-torso-head' : LIMB_TEXTURES[(i + rng.int(0, LIMB_TEXTURES.length - 1)) % LIMB_TEXTURES.length]
       gib.vx = Math.cos(angle) * speed
       gib.vy = Math.sin(angle) * speed
       gib.spin = rng.range(-0.34, 0.34)
@@ -180,7 +202,7 @@ export class GoreFx {
       gib.spin = rng.range(-0.3, 0.3)
       gib.lifeMs = rng.int(2200, 4800)
       gib.sprite
-        .setTexture(rng.next() < 0.22 ? 'bone-gib' : 'meat-gib')
+        .setTexture(rng.next() < 0.34 ? 'gore-meat-7' : rng.next() < 0.5 ? 'gore-meat-12' : 'gore-meat-1')
         .setPosition(hit.x + cameraX, hit.y + cameraY)
         .setScale(rng.range(0.75, 1.35))
         .setRotation(rng.range(-Math.PI, Math.PI))
@@ -195,7 +217,7 @@ export class GoreFx {
     this.decalCursor = (this.decalCursor + 1) % this.decals.length
     decal.lifeMs = DECAL_LIFE_MS
     decal.sprite
-      .setTexture(`blood-splat-${rng.int(0, 2)}`)
+      .setTexture(rng.next() < 0.5 ? 'gore-blood-trail-2' : 'gore-blood-trail-4')
       .setPosition(hit.x + cameraX + rng.range(-5, 5), hit.y + cameraY + rng.range(-5, 5))
       .setScale(rng.range(0.7, 1.45) * scaleMultiplier)
       .setRotation(rng.range(-Math.PI, Math.PI))
@@ -223,46 +245,6 @@ export class GoreFx {
       graphics.clear()
     }
 
-    graphics.fillStyle(0x8e1b2f, 1)
-    graphics.fillCircle(6, 6, 5)
-    graphics.fillCircle(11, 7, 4)
-    graphics.fillStyle(0xf06169, 0.6)
-    graphics.fillCircle(7, 4, 2)
-    graphics.generateTexture('meat-gib', 16, 14)
-    graphics.clear()
-
-    graphics.fillStyle(0xd8c9a8, 1)
-    graphics.fillRect(4, 4, 10, 4)
-    graphics.fillCircle(4, 6, 3)
-    graphics.fillCircle(14, 6, 3)
-    graphics.generateTexture('bone-gib', 18, 12)
-    graphics.clear()
-
-    graphics.fillStyle(0x607e4b, 1)
-    graphics.fillRect(3, 4, 17, 7)
-    graphics.fillStyle(0x8f1a2d, 1)
-    graphics.fillCircle(3, 7, 3)
-    graphics.generateTexture('zombie-arm', 22, 14)
-    graphics.clear()
-
-    graphics.fillStyle(0x526f43, 1)
-    graphics.fillRect(4, 3, 9, 22)
-    graphics.fillStyle(0x8f1a2d, 1)
-    graphics.fillCircle(8, 3, 3)
-    graphics.fillStyle(0x283722, 1)
-    graphics.fillRect(2, 22, 13, 5)
-    graphics.generateTexture('zombie-leg', 17, 28)
-    graphics.clear()
-
-    graphics.fillStyle(0x627f4a, 1)
-    graphics.fillCircle(12, 12, 10)
-    graphics.fillStyle(0x27351f, 1)
-    graphics.fillRect(2, 4, 9, 4)
-    graphics.fillStyle(0xa3bd62, 1)
-    graphics.fillCircle(16, 9, 2)
-    graphics.fillStyle(0x8f1a2d, 1)
-    graphics.fillCircle(5, 18, 4)
-    graphics.generateTexture('zombie-head', 24, 24)
     graphics.destroy()
   }
 }

@@ -14,6 +14,7 @@ const WORLD_WIDTH = 960
 const WORLD_HEIGHT = 540
 const ENEMY_CAPACITY = 220
 const SLASH_TRAIL_ANGLES = [-0.72, -0.36, 0, 0.36, 0.72]
+const SWORD_MOUTH_X = 26
 
 export class GameScene extends Phaser.Scene {
   private readonly fixed = new FixedTick()
@@ -21,7 +22,7 @@ export class GameScene extends Phaser.Scene {
   private state = new GameState(0xa11e1)
   private player!: Phaser.GameObjects.Container
   private headRig!: Phaser.GameObjects.Container
-  private sword!: Phaser.GameObjects.Rectangle
+  private sword!: Phaser.GameObjects.Image
   private swordTrails: Phaser.GameObjects.Rectangle[] = []
   private crosshair!: Phaser.GameObjects.Container
   private aimGuide!: Phaser.GameObjects.Graphics
@@ -44,8 +45,27 @@ export class GameScene extends Phaser.Scene {
   private queuedDashRelease = false
   private queuedWhirlwind = false
 
+  preload(): void {
+    this.load.image('apple-inu-body', 'assets/characters/apple-inu/body.png')
+    this.load.image('apple-inu-head', 'assets/characters/apple-inu/head.png')
+    this.load.image('apple-inu-sword', 'assets/characters/apple-inu/sword.png')
+    this.load.image('zombie-walker', 'assets/enemies/zombies/walker.png')
+    this.load.image('zombie-heavy', 'assets/enemies/zombies/heavy.png')
+    this.load.image('zombie-heavy-missing-left-arm', 'assets/enemies/zombies/heavy-missing-left-arm.png')
+    this.load.image('zombie-heavy-missing-right-arm', 'assets/enemies/zombies/heavy-missing-right-arm.png')
+    this.load.image('zombie-part-arm-left', 'assets/enemies/zombies/parts/arm-left.png')
+    this.load.image('zombie-part-arm-right', 'assets/enemies/zombies/parts/arm-right.png')
+    this.load.image('zombie-part-leg-left', 'assets/enemies/zombies/parts/leg-left.png')
+    this.load.image('zombie-part-leg-right', 'assets/enemies/zombies/parts/leg-right.png')
+    this.load.image('zombie-part-torso-head', 'assets/enemies/zombies/parts/torso-head.png')
+    this.load.image('gore-meat-1', 'assets/gore/gibs/meat-1.png')
+    this.load.image('gore-meat-7', 'assets/gore/gibs/meat-7.png')
+    this.load.image('gore-meat-12', 'assets/gore/gibs/meat-12.png')
+    this.load.image('gore-blood-trail-2', 'assets/gore/decals/trail-2.png')
+    this.load.image('gore-blood-trail-4', 'assets/gore/decals/trail-4.png')
+  }
+
   create(): void {
-    this.createPlaceholderTextures()
     this.createArena()
     this.createPropRenderers()
     this.gore = new GoreFx(this)
@@ -187,12 +207,21 @@ export class GameScene extends Phaser.Scene {
       }
       const impulseSpeed = Math.hypot(enemy.impulseX, enemy.impulseY)
       const wobble = Math.sin((this.state.tick + enemy.id * 13) * 0.12) * (0.055 + Math.min(0.12, impulseSpeed * 0.012))
+      const texture =
+        enemy.mass > 1.35
+          ? enemy.severedArm === 'left'
+            ? 'zombie-heavy-missing-left-arm'
+            : enemy.severedArm === 'right'
+              ? 'zombie-heavy-missing-right-arm'
+              : 'zombie-heavy'
+          : 'zombie-walker'
       sprite
+        .setTexture(texture)
         .setVisible(true)
         .setPosition(WORLD_CX + enemy.x, WORLD_CY + enemy.y)
         .setRotation(Math.atan2(enemy.vy, enemy.vx) + wobble)
-        .setScale(enemy.radius / 12)
-        .setTint(enemy.mass > 1.35 ? 0xa28755 : enemy.id % 3 === 0 ? 0x6f8950 : 0x7b9954)
+        .setScale(enemy.radius / 24)
+        .clearTint()
     }
 
     for (let i = 0; i < this.propSprites.length; i += 1) {
@@ -287,27 +316,19 @@ export class GameScene extends Phaser.Scene {
     const bladeLength = BASE_SWORD.outerRadius - BASE_SWORD.innerRadius
     const makeTrail = (angle: number) =>
       this.add
-        .rectangle(BASE_SWORD.innerRadius, 0, bladeLength, 11, 0xff4f8d, 1)
+        .rectangle(SWORD_MOUTH_X, 0, bladeLength, 11, 0xff4f8d, 1)
         .setOrigin(0, 0.5)
         .setRotation(angle)
         .setAlpha(0)
 
     this.swordTrails = SLASH_TRAIL_ANGLES.map(makeTrail)
+    const body = this.add.image(-4, 0, 'apple-inu-body').setScale(0.78)
+    const head = this.add.image(13, 0, 'apple-inu-head').setScale(0.74)
+    this.sword = this.add.image(SWORD_MOUTH_X, 0, 'apple-inu-sword').setOrigin(0, 0.5)
 
-    const body = this.add.ellipse(-5, 0, 44, 27, 0xc9333d).setStrokeStyle(3, 0x230811)
-    const hind = this.add.ellipse(-24, 0, 18, 18, 0x9f2432).setStrokeStyle(2, 0x230811)
-    const head = this.add.circle(17, 0, 18, 0xef4540).setStrokeStyle(3, 0x230811)
-    const earTop = this.add.triangle(13, -16, 0, 12, 11, 0, 3, -9, 0x80202d).setStrokeStyle(2, 0x230811)
-    const earBottom = this.add.triangle(13, 16, 0, -12, 11, 0, 3, 9, 0x80202d).setStrokeStyle(2, 0x230811)
-    const muzzle = this.add.ellipse(29, 0, 15, 11, 0xf28b72).setStrokeStyle(2, 0x230811)
-    const leaf = this.add.triangle(14, -22, 0, 9, 14, 1, 2, -2, 0x78cc57).setStrokeStyle(1, 0x183b18)
-    this.sword = this.add
-      .rectangle(BASE_SWORD.innerRadius, 0, bladeLength, 7, 0xeceaf3)
-      .setOrigin(0, 0.5)
-      .setStrokeStyle(2, 0x3b3345)
-
-    this.headRig = this.add.container(0, 0, [...this.swordTrails, head, earTop, earBottom, muzzle, leaf, this.sword])
-    this.player = this.add.container(WORLD_CX, WORLD_CY, [hind, body, this.headRig]).setDepth(10)
+    // Sword is behind the head so the muzzle visibly clamps the hilt.
+    this.headRig = this.add.container(0, 0, [...this.swordTrails, this.sword, head])
+    this.player = this.add.container(WORLD_CX, WORLD_CY, [body, this.headRig]).setDepth(10)
   }
 
   private animateSword(event: Extract<SimEvent, { type: 'sword-attack' }>): void {
@@ -317,7 +338,7 @@ export class GameScene extends Phaser.Scene {
     for (const trail of this.swordTrails) this.tweens.killTweensOf(trail)
 
     this.headRig.setPosition(0, 0).setRotation(0)
-    this.sword.setPosition(BASE_SWORD.innerRadius, 0).setScale(1, 1).setAlpha(1)
+    this.sword.setPosition(SWORD_MOUTH_X, 0).setScale(1, 1).setAlpha(1)
     for (let i = 0; i < this.swordTrails.length; i += 1) {
       this.swordTrails[i].setRotation(SLASH_TRAIL_ANGLES[i]).setAlpha(0).setScale(1, 1)
     }
@@ -342,17 +363,17 @@ export class GameScene extends Phaser.Scene {
       })
     } else if (attack === 'stab') {
       this.headRig.setX(-4)
-      this.sword.setX(BASE_SWORD.innerRadius - 5).setScale(1.12, 0.9)
+      this.sword.setX(SWORD_MOUTH_X - 5).setScale(1.12, 0.9)
       this.swordTrails[2].setRotation(0).setAlpha(0.42).setScale(1.3, 0.75)
       this.tweens.add({ targets: this.headRig, x: 12, duration: 58, yoyo: true, ease: 'Quad.Out' })
-      this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
+      this.tweens.add({ targets: this.sword, x: SWORD_MOUTH_X + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
     } else if (attack === 'dash') {
       const power = event.power ?? 0
       this.headRig.setX(-9)
-      this.sword.setX(BASE_SWORD.innerRadius - 7).setScale(1.22 + power * 0.22, 0.82)
+      this.sword.setX(SWORD_MOUTH_X - 7).setScale(1.22 + power * 0.22, 0.82)
       this.swordTrails[2].setRotation(0).setAlpha(0.58).setScale(1.65 + power * 0.55, 0.65)
       this.tweens.add({ targets: this.headRig, x: 22, duration: 72, yoyo: true, ease: 'Expo.Out' })
-      this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 38, duration: 72, yoyo: true, ease: 'Expo.Out' })
+      this.tweens.add({ targets: this.sword, x: SWORD_MOUTH_X + 38, duration: 72, yoyo: true, ease: 'Expo.Out' })
     } else if (attack === 'whirlwind') {
       this.sword.setScale(1.12, 1.28)
       for (let i = 0; i < this.swordTrails.length; i += 1) {
@@ -433,7 +454,7 @@ export class GameScene extends Phaser.Scene {
 
   private createEnemyRenderPool(): void {
     for (let i = 0; i < ENEMY_CAPACITY; i += 1) {
-      const zombie = this.add.image(-9999, -9999, 'zombie-placeholder').setVisible(false).setDepth(5)
+      const zombie = this.add.image(-9999, -9999, 'zombie-walker').setVisible(false).setDepth(5)
       this.zombieSprites.push(zombie)
     }
   }
@@ -453,25 +474,6 @@ export class GameScene extends Phaser.Scene {
       .setDepth(100)
   }
 
-  private createPlaceholderTextures(): void {
-    if (this.textures.exists('zombie-placeholder')) return
-    const graphics = this.add.graphics()
-
-    graphics.fillStyle(0x182018, 1)
-    graphics.fillEllipse(14, 16, 20, 25)
-    graphics.fillStyle(0x5f7445, 1)
-    graphics.fillEllipse(15, 16, 17, 22)
-    graphics.fillCircle(24, 16, 8)
-    graphics.fillStyle(0x27351f, 1)
-    graphics.fillRect(5, 5, 12, 4)
-    graphics.fillRect(5, 23, 12, 4)
-    graphics.fillStyle(0xa3bd62, 1)
-    graphics.fillCircle(27, 13, 2)
-    graphics.fillStyle(0x541928, 1)
-    graphics.fillCircle(22, 21, 3)
-    graphics.generateTexture('zombie-placeholder', 34, 32)
-    graphics.destroy()
-  }
 
   private showRunEnded(): void {
     if (this.endedText) return

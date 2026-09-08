@@ -1,3 +1,5 @@
+export type SeveredArm = 'none' | 'left' | 'right'
+
 export interface EnemyState {
   id: number
   active: boolean
@@ -12,4 +14,5 @@ export interface EnemyState {
   impulseX: number
   impulseY: number
   staggerTicks: number
+  severedArm: SeveredArm
 }
