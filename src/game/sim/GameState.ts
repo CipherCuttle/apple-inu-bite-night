@@ -25,8 +25,14 @@ export type SimEvent =
 const PLAYER_SPEED = 3.25
 const PLAYER_RADIUS = 14
 const TARGET_ENEMIES = 120
-const ARENA_HALF_W = 720
-const ARENA_HALF_H = 420
+
+// One-screen Phase-1 arena. Keep the player inside the visible 960×540 playfield
+// with enough HUD/border margin that authoritative position never disappears
+// beyond the render surface.
+export const ARENA_BOUNDS = {
+  halfWidth: 430,
+  halfHeight: 235,
+} as const
 
 export class GameState {
   readonly seed: number
@@ -95,8 +101,8 @@ export class GameState {
 
     const nx = input.x / Math.max(1, length)
     const ny = input.y / Math.max(1, length)
-    this.player.x = clamp(this.player.x + nx * PLAYER_SPEED, -ARENA_HALF_W, ARENA_HALF_W)
-    this.player.y = clamp(this.player.y + ny * PLAYER_SPEED, -ARENA_HALF_H, ARENA_HALF_H)
+    this.player.x = clamp(this.player.x + nx * PLAYER_SPEED, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
+    this.player.y = clamp(this.player.y + ny * PLAYER_SPEED, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
     this.player.facing = Math.atan2(ny, nx)
   }
 
