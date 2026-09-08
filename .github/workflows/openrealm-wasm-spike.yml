@@ -42,6 +42,7 @@ jobs:
           cd open-realm
           python3 ../spike/wasm/patch_openrealm.py
           python3 ../spike/wasm/patch_wasm32_save.py
+          python3 ../spike/wasm/patch_wasm_audio.py
           git diff --check
           git diff --stat
 
