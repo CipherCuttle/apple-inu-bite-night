@@ -1,0 +1,86 @@
+name: hero-line-wars-kernel
+
+on:
+  push:
+    branches: [phase-1/hero-line-wars-kernel-v0]
+  workflow_dispatch:
+
+concurrency:
+  group: hero-line-wars-kernel-v0
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v10
+        with:
+          version: 6.0.9
+          no-cache: true
+
+      - name: Clone pinned OpenRealm
+        run: |
+          git clone https://github.com/corepunch/open-realm.git open-realm
+          git -C open-realm checkout cf12357883950c14abce8d636596952c3fc547bb
+          test "$(git -C open-realm rev-parse HEAD)" = "cf12357883950c14abce8d636596952c3fc547bb"
+
+      - name: Apply browser engine and Hero Line Wars overlays
+        run: |
+          cd open-realm
+          python3 ../spike/wasm/patch_openrealm.py
+          python3 ../spike/wasm/patch_wasm32_save.py
+          python3 ../spike/wasm/patch_wasm_audio.py
+          python3 ../spike/wasm/patch_wasm_menu_abi.py
+          python3 ../spike/wasm/patch_wasm_init_trace.py
+          python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
+          python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
+          python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
+          python3 ../spike/wasm/patch_wasm_selection_ring.py
+          python3 ../spike/wasm/patch_hero_line_wars.py
+          git diff --check
+          git diff --stat
+
+      - name: Compile and link OpenRealm wasm
+        run: |
+          python3 spike/wasm/patch_menu_object_isolation.py
+          bash spike/wasm/build_openrealm_wasm.sh open-realm
+          python3 spike/wasm/decorate_hlw_html.py open-realm/build-wasm/openrealm.html
+          test -s open-realm/build-wasm/openrealm.html
+          test -s open-realm/build-wasm/openrealm.js
+          test -s open-realm/build-wasm/openrealm.wasm
+          test -s open-realm/build-wasm/openrealm.data
+
+      - name: Browser gameplay gates
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/openrealm-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/openrealm.html >/dev/null; then break; fi
+            sleep 0.25
+          done
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$chrome"
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0 pngjs@7.0.0
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html timeout 90s node spike/wasm/browser_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html timeout 90s node spike/wasm/browser_selection_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html timeout 90s node spike/wasm/browser_hlw_smoke.mjs
+
+      - name: Upload playable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-line-wars-openrealm-wasm
+          path: |
+            open-realm/build-wasm/openrealm.html
+            open-realm/build-wasm/openrealm.js
+            open-realm/build-wasm/openrealm.wasm
+            open-realm/build-wasm/openrealm.data
+          if-no-files-found: error
