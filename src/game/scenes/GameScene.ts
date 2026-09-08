@@ -5,7 +5,6 @@ import { KeyboardCombatBuffer } from '../input/KeyboardCombatBuffer'
 import { ARENA_BOUNDS, GameState, type InputState, type PowerupKind, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import type { PropMaterial } from '../world/Props'
-import { CITY_LEVEL_OBSTACLES } from '../world/Level'
 import { GoreFx } from '../../presentation/GoreFx'
 import { getImpactProfile } from '../../presentation/CombatFeel'
 import { Sfx } from '../../presentation/Sfx'
@@ -16,7 +15,7 @@ const WORLD_WIDTH = 960
 const WORLD_HEIGHT = 540
 const ENEMY_CAPACITY = 220
 const SLASH_TRAIL_ANGLES = [-0.72, -0.36, 0, 0.36, 0.72]
-const SWORD_MOUTH_X = 28
+const SWORD_MOUTH_X = 23
 const SWORD_REST_ANGLE = -Math.PI * 0.42
 
 export class GameScene extends Phaser.Scene {
@@ -50,9 +49,8 @@ export class GameScene extends Phaser.Scene {
   private hitStopMs = 0
 
   preload(): void {
-    this.load.image('city-tiles', 'assets/levels/city-block/tiles.png')
-    this.load.tilemapTiledJSON('city-level', 'assets/levels/city-block/map.json')
     this.load.image('apple-inu-sword', 'assets/characters/apple-inu/sword.png')
+    this.load.svg('apple-inu-head', 'assets/characters/apple-inu/head.svg', { width: 48, height: 48 })
     this.load.image('zombie-walker', 'assets/enemies/zombies/walker.png')
     this.load.image('zombie-heavy', 'assets/enemies/zombies/heavy.png')
     this.load.image('zombie-heavy-missing-left-arm', 'assets/enemies/zombies/heavy-missing-left-arm.png')
@@ -71,7 +69,6 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.createArena()
-    this.createImportedCityLevel()
     this.createPropRenderers()
     this.gore = new GoreFx(this)
     this.createPlayer()
@@ -283,6 +280,17 @@ export class GameScene extends Phaser.Scene {
       ARENA_BOUNDS.halfWidth * 2,
       ARENA_BOUNDS.halfHeight * 2,
     )
+    graphics.fillStyle(0x16131c, 1)
+    graphics.fillRect(70, 95, 820, 350)
+    graphics.fillStyle(0x201b27, 1)
+    graphics.fillRect(70, 95, 820, 38)
+    graphics.fillRect(70, 407, 820, 38)
+    graphics.fillStyle(0xb49855, 0.28)
+    for (let x = 110; x < 860; x += 86) graphics.fillRect(x, 266, 42, 3)
+    graphics.fillStyle(0xd8d2c8, 0.16)
+    for (let i = 0; i < 6; i += 1) graphics.fillRect(150 + i * 18, 126, 9, 54)
+    graphics.fillStyle(0x573046, 0.22)
+    graphics.fillRect(725, 358, 120, 4)
     graphics.lineStyle(1, 0x2a1835, 0.42)
     for (let x = 0; x <= WORLD_WIDTH; x += 32) graphics.lineBetween(x, 0, x, WORLD_HEIGHT)
     for (let y = 0; y <= WORLD_HEIGHT; y += 32) graphics.lineBetween(0, y, WORLD_WIDTH, y)
@@ -293,26 +301,6 @@ export class GameScene extends Phaser.Scene {
       ARENA_BOUNDS.halfWidth * 2,
       ARENA_BOUNDS.halfHeight * 2,
     )
-  }
-
-  private createImportedCityLevel(): void {
-    const map = this.make.tilemap({ key: 'city-level' })
-    const tiles = map.addTilesetImage('city-tileset', 'city-tiles', 8, 8, 0, 1)
-    if (tiles) {
-      const x = WORLD_CX - 440
-      const y = WORLD_CY - 240
-      map.createLayer('Terrain', tiles, x, y)?.setScale(2).setAlpha(0.34).setDepth(1)
-      map.createLayer('Objects', tiles, x, y)?.setScale(2).setAlpha(0.58).setDepth(2)
-    }
-    const graphics = this.add.graphics().setDepth(2.5)
-    for (const obstacle of CITY_LEVEL_OBSTACLES) {
-      graphics.fillStyle(0x0c0910, 0.82)
-      graphics.fillRect(WORLD_CX + obstacle.x - obstacle.width / 2, WORLD_CY + obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height)
-      graphics.lineStyle(2, 0x68415f, 0.78)
-      graphics.strokeRect(WORLD_CX + obstacle.x - obstacle.width / 2, WORLD_CY + obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height)
-      graphics.lineStyle(1, 0x3a2638, 0.55)
-      for (let yy = -obstacle.height / 2 + 12; yy < obstacle.height / 2; yy += 18) graphics.lineBetween(WORLD_CX + obstacle.x - obstacle.width / 2 + 8, WORLD_CY + obstacle.y + yy, WORLD_CX + obstacle.x + obstacle.width / 2 - 8, WORLD_CY + obstacle.y + yy)
-    }
   }
 
   private createPropRenderers(): void {
@@ -342,65 +330,43 @@ export class GameScene extends Phaser.Scene {
     const dark = 0x17151b
     const fur = 0xf5f4ee
     const furHighlight = 0xffffff
-    const furShade = 0xd7dae2
-    const green = 0x5bbd4a
+    const furShade = 0xcfd3dc
 
     const makeTrail = (angle: number) =>
       this.add
-        .rectangle(SWORD_MOUTH_X, 0, bladeLength, 11, 0xff4f8d, 1)
+        .rectangle(SWORD_MOUTH_X, 0, bladeLength, 9, 0xff4f8d, 1)
         .setOrigin(0, 0.5)
         .setRotation(SWORD_REST_ANGLE + angle)
         .setAlpha(0)
 
     this.swordTrails = SLASH_TRAIL_ANGLES.map(makeTrail)
 
-    const shadow = this.add.ellipse(-7, 7, 58, 34, 0x000000, 0.28)
-    const tail = this.add.ellipse(-31, -2, 23, 9, furShade).setStrokeStyle(3, dark).setRotation(-0.72)
-    const hind = this.add.ellipse(-22, 0, 23, 23, fur).setStrokeStyle(3, dark)
-    const body = this.add.ellipse(-5, 0, 48, 31, fur).setStrokeStyle(3, dark)
-    const chest = this.add.ellipse(8, 0, 29, 25, furHighlight).setStrokeStyle(2, dark)
-    const pawBackTop = this.add.ellipse(-18, -14, 15, 8, furShade).setStrokeStyle(2, dark).setRotation(-0.18)
-    const pawBackBottom = this.add.ellipse(-18, 14, 15, 8, furShade).setStrokeStyle(2, dark).setRotation(0.18)
-    const pawFrontTop = this.add.ellipse(5, -15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(-0.12)
-    const pawFrontBottom = this.add.ellipse(5, 15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(0.12)
+    const shadow = this.add.ellipse(-5, 5, 43, 24, 0x000000, 0.25)
+    const tail = this.add.ellipse(-25, -2, 16, 6, furShade).setStrokeStyle(2, dark).setRotation(-0.72)
+    const hind = this.add.ellipse(-18, 0, 18, 18, fur).setStrokeStyle(2, dark)
+    const body = this.add.ellipse(-3, 0, 36, 24, fur).setStrokeStyle(2, dark)
+    const chest = this.add.ellipse(8, 0, 20, 18, furHighlight).setStrokeStyle(2, dark)
+    const pawBackTop = this.add.ellipse(-15, -11, 11, 6, furShade).setStrokeStyle(1.5, dark).setRotation(-0.18)
+    const pawBackBottom = this.add.ellipse(-15, 11, 11, 6, furShade).setStrokeStyle(1.5, dark).setRotation(0.18)
+    const pawFrontTop = this.add.ellipse(4, -11, 12, 6, furHighlight).setStrokeStyle(1.5, dark).setRotation(-0.12)
+    const pawFrontBottom = this.add.ellipse(4, 11, 12, 6, furHighlight).setStrokeStyle(1.5, dark).setRotation(0.12)
 
-    // Apple-logo-first top silhouette: deliberately faceted for top-down readability.
-    const outline = this.add.polygon(10, 0, [
-      5, -25, -3, -20, -12, -22, -21, -16, -26, -6, -25, 7, -19, 18, -10, 27, 1, 31,
-      10, 27, 16, 20, 21, 21, 30, 14, 34, 5, 33, -5, 28, -15, 19, -22, 11, -23,
-    ], dark, 1)
-    const apple = this.add.polygon(10, 0, [
-      5, -20, -2, -16, -10, -18, -17, -13, -21, -5, -20, 6, -15, 15, -7, 22, 2, 26,
-      9, 22, 14, 16, 19, 17, 26, 11, 29, 4, 28, -4, 24, -12, 17, -18, 10, -19,
-    ], furHighlight, 1)
-    const topCleft = this.add.triangle(10, -20, -5, 0, 5, 0, 0, 9, dark).setRotation(Math.PI)
-    const bite1 = this.add.circle(29, -8, 7, dark)
-    const bite2 = this.add.circle(33, 0, 7.5, dark)
-    const bite3 = this.add.circle(29, 8, 6.5, dark)
-    const stem = this.add.rectangle(10, -28, 4, 10, 0x79513a).setRotation(0.24)
-    const leaf = this.add.ellipse(0, -31, 20, 8, green).setStrokeStyle(2, dark).setRotation(-0.48)
-
-    // Side-bite clamp: sword hilt is physically layered between lower and upper jaw.
-    const lowerJaw = this.add.ellipse(SWORD_MOUTH_X - 2, 4, 18, 8, furShade).setStrokeStyle(2, dark)
+    const head = this.add.image(9, 0, 'apple-inu-head').setDisplaySize(42, 42)
+    const mouthGap = this.add.ellipse(SWORD_MOUTH_X - 2, 0, 14, 8, dark, 0.95)
+    const lowerJaw = this.add.ellipse(SWORD_MOUTH_X - 3, 4, 14, 6, furShade).setStrokeStyle(1.5, dark)
     this.sword = this.add
       .image(SWORD_MOUTH_X, 0, 'apple-inu-sword')
       .setOrigin(0.08, 0.5)
       .setRotation(SWORD_REST_ANGLE)
       .setScale(1.04)
-    const upperJaw = this.add.ellipse(SWORD_MOUTH_X - 2, -4, 18, 8, furHighlight).setStrokeStyle(2, dark)
-    const toothTop = this.add.triangle(SWORD_MOUTH_X + 1, -1, 0, 0, 5, 0, 2, 5, 0xfefefe).setRotation(0.08)
-    const toothBottom = this.add.triangle(SWORD_MOUTH_X + 1, 1, 0, 0, 5, 0, 2, -5, 0xe9e9e5).setRotation(-0.08)
+    const upperJaw = this.add.ellipse(SWORD_MOUTH_X - 3, -4, 14, 6, furHighlight).setStrokeStyle(1.5, dark)
+    const toothTop = this.add.triangle(SWORD_MOUTH_X, -1, 0, 0, 4, 0, 2, 4, 0xfefefe)
+    const toothBottom = this.add.triangle(SWORD_MOUTH_X, 1, 0, 0, 4, 0, 2, -4, 0xe9e9e5)
 
     this.headRig = this.add.container(0, 0, [
       ...this.swordTrails,
-      outline,
-      apple,
-      topCleft,
-      bite1,
-      bite2,
-      bite3,
-      stem,
-      leaf,
+      head,
+      mouthGap,
       lowerJaw,
       this.sword,
       upperJaw,
@@ -515,8 +481,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnDashAfterimage(event: Extract<SimEvent, { type: 'dash-step' }>): void {
-    const body = this.add.ellipse(-4, 0, 42, 24, 0xff4f8d, 0.14)
-    const blade = this.add.rectangle(15, 0, 84, 5, 0xffb6cf, 0.2).setOrigin(0, 0.5)
+    const body = this.add.ellipse(-4, 0, 30, 18, 0xff4f8d, 0.1)
+    const blade = this.add.rectangle(15, 0, 72, 4, 0xffb6cf, 0.16).setOrigin(0, 0.5)
     const ghost = this.add
       .container(WORLD_CX + event.x, WORLD_CY + event.y, [body, blade])
       .setRotation(event.facing)
