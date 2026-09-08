@@ -21,16 +21,28 @@ export class Sfx {
     const gain = ctx.createGain()
     const now = ctx.currentTime
 
-    oscillator.type = kind === 'stab' ? 'triangle' : 'sawtooth'
-    oscillator.frequency.setValueAtTime(kind === 'stab' ? 230 : 390, now)
-    oscillator.frequency.exponentialRampToValueAtTime(kind === 'stab' ? 74 : 96, now + (kind === 'stab' ? 0.055 : 0.082))
+    const profile =
+      kind === 'stab'
+        ? { type: 'triangle' as OscillatorType, start: 230, end: 74, peak: 0.042, duration: 0.075 }
+        : kind === 'dash'
+          ? { type: 'triangle' as OscillatorType, start: 520, end: 62, peak: 0.065, duration: 0.13 }
+          : kind === 'whirlwind'
+            ? { type: 'sawtooth' as OscillatorType, start: 640, end: 88, peak: 0.052, duration: 0.2 }
+            : { type: 'sawtooth' as OscillatorType, start: 430, end: 92, peak: 0.04, duration: 0.12 }
+
+    oscillator.type = profile.type
+    oscillator.frequency.setValueAtTime(profile.start, now)
+    oscillator.frequency.exponentialRampToValueAtTime(profile.end, now + profile.duration * 0.86)
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(kind === 'stab' ? 0.042 : 0.034, now + 0.006)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'stab' ? 0.07 : 0.09))
+    gain.gain.exponentialRampToValueAtTime(profile.peak, now + 0.006)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + profile.duration)
 
     oscillator.connect(gain).connect(ctx.destination)
     oscillator.start(now)
-    oscillator.stop(now + (kind === 'stab' ? 0.075 : 0.095))
+    oscillator.stop(now + profile.duration + 0.005)
+
+    if (kind === 'dash') this.lowThump(54)
+    if (kind === 'whirlwind') this.lowThump(64)
   }
 
   hit(weight: 'light' | 'heavy' | 'massacre'): void {
