@@ -21,6 +21,7 @@ describe('soulslike stamina / dodge v0', () => {
     const state = new GameState(302, DEFAULT_LOADOUT)
     state.player.hp = 999
     state.stamina.current = 0
+    state.stamina.lockedUntilTick = 999
 
     state.step({ x: 0, y: 0, aimRadians: 0, slash: true })
 
