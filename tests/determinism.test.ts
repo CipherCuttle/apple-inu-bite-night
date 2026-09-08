@@ -3,10 +3,15 @@ import { GameState, type InputState } from '../src/game/sim/GameState'
 
 function scriptedInput(tick: number): InputState {
   const phase = Math.floor(tick / 120) % 4
-  if (phase === 0) return { x: 1, y: 0 }
-  if (phase === 1) return { x: 0, y: 1 }
-  if (phase === 2) return { x: -1, y: 0 }
-  return { x: 0, y: -1 }
+  const movement =
+    phase === 0 ? { x: 1, y: 0 } : phase === 1 ? { x: 0, y: 1 } : phase === 2 ? { x: -1, y: 0 } : { x: 0, y: -1 }
+  const stab = tick % 113 === 0
+  return {
+    ...movement,
+    aimRadians: ((tick * 7) % 360) * (Math.PI / 180),
+    slash: !stab && tick % 23 === 0,
+    stab,
+  }
 }
 
 function run(seed: number, ticks: number): string {
@@ -16,7 +21,7 @@ function run(seed: number, ticks: number): string {
 }
 
 describe('deterministic simulation', () => {
-  it('same seed + same input yields identical state hash', () => {
+  it('same seed + same movement/aim/attack input yields identical state hash', () => {
     expect(run(0xa11e1, 900)).toBe(run(0xa11e1, 900))
   })
 

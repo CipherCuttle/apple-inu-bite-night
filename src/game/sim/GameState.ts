@@ -1,4 +1,4 @@
-import { BASE_SWORD, isPointInSwordArc } from '../combat/Sword'
+import { isPointInSwordArc, normalizeAngle, swordForAttack, type AttackKind } from '../combat/Sword'
 import { EnemyPool } from '../enemies/EnemyPool'
 import type { EnemyState } from '../enemies/Enemy'
 import { XorShift32 } from './RNG'
@@ -6,6 +6,9 @@ import { XorShift32 } from './RNG'
 export interface InputState {
   x: number
   y: number
+  aimRadians?: number
+  slash?: boolean
+  stab?: boolean
 }
 
 export interface PlayerState {
@@ -17,8 +20,8 @@ export interface PlayerState {
 }
 
 export type SimEvent =
-  | { type: 'sword-swing'; tick: number; x: number; y: number; facing: number }
-  | { type: 'enemy-hit'; tick: number; enemyId: number; x: number; y: number; killed: boolean; facing: number }
+  | { type: 'sword-attack'; attack: AttackKind; tick: number; x: number; y: number; facing: number }
+  | { type: 'enemy-hit'; attack: AttackKind; tick: number; enemyId: number; x: number; y: number; killed: boolean; facing: number }
   | { type: 'player-hit'; tick: number; hp: number }
   | { type: 'run-ended'; tick: number; kills: number }
 
@@ -26,9 +29,6 @@ const PLAYER_SPEED = 3.25
 const PLAYER_RADIUS = 14
 const TARGET_ENEMIES = 120
 
-// One-screen Phase-1 arena. Keep the player inside the visible 960×540 playfield
-// with enough HUD/border margin that authoritative position never disappears
-// beyond the render surface.
 export const ARENA_BOUNDS = {
   halfWidth: 430,
   halfHeight: 235,
@@ -43,7 +43,7 @@ export class GameState {
   tick = 0
   kills = 0
   ended = false
-  private lastAttackTick = -BASE_SWORD.cooldownTicks
+  private nextAttackTick = 0
 
   constructor(seed: number) {
     this.seed = seed >>> 0
@@ -58,7 +58,7 @@ export class GameState {
 
     this.updatePlayer(input)
     this.updateEnemies()
-    this.trySwordAttack()
+    this.trySwordAttack(input)
     this.resolveEnemyContact()
     this.ensurePopulation()
 
@@ -81,7 +81,9 @@ export class GameState {
     feed(this.kills)
     feed(this.player.x)
     feed(this.player.y)
+    feed(this.player.facing)
     feed(this.player.hp)
+    feed(this.nextAttackTick)
     feed(this.rng.snapshot())
 
     for (const enemy of this.enemies.items) {
@@ -97,13 +99,15 @@ export class GameState {
 
   private updatePlayer(input: InputState): void {
     const length = Math.hypot(input.x, input.y)
-    if (length <= 0.0001) return
+    if (length > 0.0001) {
+      const nx = input.x / Math.max(1, length)
+      const ny = input.y / Math.max(1, length)
+      this.player.x = clamp(this.player.x + nx * PLAYER_SPEED, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
+      this.player.y = clamp(this.player.y + ny * PLAYER_SPEED, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
+      if (!Number.isFinite(input.aimRadians)) this.player.facing = Math.atan2(ny, nx)
+    }
 
-    const nx = input.x / Math.max(1, length)
-    const ny = input.y / Math.max(1, length)
-    this.player.x = clamp(this.player.x + nx * PLAYER_SPEED, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-    this.player.y = clamp(this.player.y + ny * PLAYER_SPEED, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
-    this.player.facing = Math.atan2(ny, nx)
+    if (Number.isFinite(input.aimRadians)) this.player.facing = normalizeAngle(input.aimRadians as number)
   }
 
   private updateEnemies(): void {
@@ -121,21 +125,24 @@ export class GameState {
     }
   }
 
-  private trySwordAttack(): void {
-    if (this.tick - this.lastAttackTick < BASE_SWORD.cooldownTicks) return
-    this.lastAttackTick = this.tick
-    this.events.push({ type: 'sword-swing', tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
+  private trySwordAttack(input: InputState): void {
+    const attack: AttackKind | null = input.stab ? 'stab' : input.slash ? 'slash' : null
+    if (!attack || this.tick < this.nextAttackTick) return
+
+    const config = swordForAttack(attack)
+    this.nextAttackTick = this.tick + config.cooldownTicks
+    this.events.push({ type: 'sword-attack', attack, tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
 
     for (const enemy of this.enemies.items) {
       if (!enemy.active) continue
-      if (!isPointInSwordArc(this.player.x, this.player.y, this.player.facing, enemy.x, enemy.y, enemy.radius, BASE_SWORD)) continue
+      if (!isPointInSwordArc(this.player.x, this.player.y, this.player.facing, enemy.x, enemy.y, enemy.radius, config)) continue
 
-      enemy.hp -= BASE_SWORD.damage
+      enemy.hp -= config.damage
       const killed = enemy.hp <= 0
       const hitX = enemy.x
       const hitY = enemy.y
-      enemy.x += Math.cos(this.player.facing) * BASE_SWORD.knockback
-      enemy.y += Math.sin(this.player.facing) * BASE_SWORD.knockback
+      enemy.x += Math.cos(this.player.facing) * config.knockback
+      enemy.y += Math.sin(this.player.facing) * config.knockback
 
       if (killed) {
         this.kills += 1
@@ -144,6 +151,7 @@ export class GameState {
 
       this.events.push({
         type: 'enemy-hit',
+        attack,
         tick: this.tick,
         enemyId: enemy.id,
         x: hitX,

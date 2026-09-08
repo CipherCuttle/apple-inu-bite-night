@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { BASE_SWORD } from '../combat/Sword'
+import { BASE_SWORD, type AttackKind } from '../combat/Sword'
 import { ARENA_BOUNDS, GameState, type InputState } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import { GoreFx } from '../../presentation/GoreFx'
@@ -15,8 +15,10 @@ export class GameScene extends Phaser.Scene {
   private readonly sfx = new Sfx()
   private state = new GameState(0xa11e1)
   private player!: Phaser.GameObjects.Container
+  private headRig!: Phaser.GameObjects.Container
   private sword!: Phaser.GameObjects.Rectangle
   private swordTrails: Phaser.GameObjects.Rectangle[] = []
+  private crosshair!: Phaser.GameObjects.Container
   private hpText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
   private killText!: Phaser.GameObjects.Text
@@ -25,6 +27,9 @@ export class GameScene extends Phaser.Scene {
   private gore!: GoreFx
   private endedText?: Phaser.GameObjects.Text
   private hitStopMs = 0
+  private mouseActive = false
+  private queuedSlash = false
+  private queuedStab = false
 
   create(): void {
     this.createPlaceholderTextures()
@@ -32,6 +37,7 @@ export class GameScene extends Phaser.Scene {
     this.gore = new GoreFx(this)
     this.createPlayer()
     this.createEnemyRenderPool()
+    this.createCrosshair()
     this.createHud()
 
     const keyboard = this.input.keyboard
@@ -42,20 +48,42 @@ export class GameScene extends Phaser.Scene {
       left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     }
+
     keyboard.on('keydown', () => this.sfx.unlock())
+    keyboard.on('keydown-SPACE', () => {
+      this.queuedSlash = true
+    })
+    keyboard.on('keydown-E', () => {
+      this.queuedStab = true
+    })
     keyboard.on('keydown-R', () => this.restartRun())
-    this.input.on('pointerdown', () => this.sfx.unlock())
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.wasTouch) this.mouseActive = true
+    })
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.sfx.unlock()
+      if (pointer.wasTouch) return
+      this.mouseActive = true
+      if (pointer.leftButtonDown()) this.queuedSlash = true
+      if (pointer.rightButtonDown()) this.queuedStab = true
+    })
+    this.game.canvas.addEventListener('contextmenu', this.preventContextMenu)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.canvas.removeEventListener('contextmenu', this.preventContextMenu)
+    })
   }
 
   update(_time: number, delta: number): void {
+    this.syncPointerPresentation()
+
     if (this.hitStopMs > 0) {
       this.hitStopMs = Math.max(0, this.hitStopMs - delta)
       return
     }
 
-    const input = this.readInput()
     this.fixed.advance(delta, () => {
-      this.state.step(input)
+      this.state.step(this.readInputForTick())
       this.consumeEvents()
     })
 
@@ -63,11 +91,27 @@ export class GameScene extends Phaser.Scene {
     this.gore.update(delta)
   }
 
-  private readInput(): InputState {
-    return {
+  private readonly preventContextMenu = (event: Event) => {
+    event.preventDefault()
+  }
+
+  private readInputForTick(): InputState {
+    const input: InputState = {
       x: Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
       y: Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
+      slash: this.queuedSlash,
+      stab: this.queuedStab,
     }
+
+    if (this.mouseActive) {
+      const pointer = this.input.activePointer
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+      input.aimRadians = Math.atan2(world.y - (WORLD_CY + this.state.player.y), world.x - (WORLD_CX + this.state.player.x))
+    }
+
+    this.queuedSlash = false
+    this.queuedStab = false
+    return input
   }
 
   private consumeEvents(): void {
@@ -91,9 +135,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (const event of events) {
-      if (event.type === 'sword-swing') {
-        this.animateSword()
-        this.sfx.sword()
+      if (event.type === 'sword-attack') {
+        this.animateSword(event.attack)
+        this.sfx.sword(event.attack)
       }
       if (event.type === 'player-hit') {
         this.cameras.main.flash(90, 190, 18, 46, false)
@@ -128,6 +172,12 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private syncPointerPresentation(): void {
+    if (!this.mouseActive || !this.crosshair) return
+    const pointer = this.input.activePointer
+    this.crosshair.setVisible(true).setPosition(pointer.x, pointer.y)
+  }
+
   private createArena(): void {
     const graphics = this.add.graphics().setDepth(0)
     graphics.fillStyle(0x09070d, 1)
@@ -153,14 +203,14 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(): void {
     const bladeLength = BASE_SWORD.outerRadius - BASE_SWORD.innerRadius
-    const makeTrail = (angle: number, alpha: number) =>
+    const makeTrail = (angle: number) =>
       this.add
-        .rectangle(BASE_SWORD.innerRadius, 0, bladeLength, 10, 0xff4f8d, alpha)
+        .rectangle(BASE_SWORD.innerRadius, 0, bladeLength, 11, 0xff4f8d, 1)
         .setOrigin(0, 0.5)
         .setRotation(angle)
         .setAlpha(0)
 
-    this.swordTrails = [makeTrail(-0.42, 0.26), makeTrail(0.42, 0.18)]
+    this.swordTrails = [makeTrail(-0.22), makeTrail(0.22)]
 
     const body = this.add.ellipse(-5, 0, 44, 27, 0xc9333d).setStrokeStyle(3, 0x230811)
     const hind = this.add.ellipse(-24, 0, 18, 18, 0x9f2432).setStrokeStyle(2, 0x230811)
@@ -174,23 +224,56 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0, 0.5)
       .setStrokeStyle(2, 0x3b3345)
 
-    this.player = this.add
-      .container(WORLD_CX, WORLD_CY, [...this.swordTrails, hind, body, head, earTop, earBottom, muzzle, leaf, this.sword])
-      .setDepth(10)
+    this.headRig = this.add.container(0, 0, [...this.swordTrails, head, earTop, earBottom, muzzle, leaf, this.sword])
+    this.player = this.add.container(WORLD_CX, WORLD_CY, [hind, body, this.headRig]).setDepth(10)
   }
 
-  private animateSword(): void {
+  private animateSword(attack: AttackKind): void {
+    this.tweens.killTweensOf(this.headRig)
     this.tweens.killTweensOf(this.sword)
     for (const trail of this.swordTrails) this.tweens.killTweensOf(trail)
 
-    this.sword.setAlpha(1).setScale(1.08, 1.75)
-    this.tweens.add({ targets: this.sword, scaleX: 1, scaleY: 1, duration: 95, ease: 'Quad.Out' })
+    this.headRig.setPosition(0, 0).setRotation(0)
+    this.sword.setPosition(BASE_SWORD.innerRadius, 0).setScale(1, 1).setAlpha(1)
 
-    for (let i = 0; i < this.swordTrails.length; i += 1) {
-      const trail = this.swordTrails[i]
-      trail.setAlpha(i === 0 ? 0.32 : 0.22).setScale(1.04, 1.2)
-      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: 115, ease: 'Quad.Out' })
+    if (attack === 'slash') {
+      this.headRig.setRotation(-0.58)
+      this.sword.setScale(1.04, 1.38)
+      for (let i = 0; i < this.swordTrails.length; i += 1) {
+        this.swordTrails[i].setAlpha(i === 0 ? 0.36 : 0.24).setScale(1.03, 1.3)
+      }
+      this.tweens.add({
+        targets: this.headRig,
+        rotation: 0.48,
+        duration: 92,
+        ease: 'Cubic.Out',
+        onComplete: () => {
+          this.tweens.add({ targets: this.headRig, rotation: 0, duration: 65, ease: 'Quad.Out' })
+        },
+      })
+    } else {
+      this.headRig.setX(-4)
+      this.sword.setX(BASE_SWORD.innerRadius - 5).setScale(1.12, 0.9)
+      this.swordTrails[0].setRotation(0).setAlpha(0.42).setScale(1.3, 0.75)
+      this.tweens.add({ targets: this.headRig, x: 12, duration: 58, yoyo: true, ease: 'Quad.Out' })
+      this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
     }
+
+    this.tweens.add({ targets: this.sword, scaleY: 1, duration: 105, ease: 'Quad.Out' })
+    for (const trail of this.swordTrails) {
+      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: 125, ease: 'Quad.Out' })
+    }
+  }
+
+  private createCrosshair(): void {
+    const graphics = this.add.graphics()
+    graphics.lineStyle(2, 0xf44f7f, 0.92)
+    graphics.strokeCircle(0, 0, 8)
+    graphics.lineBetween(-13, 0, -5, 0)
+    graphics.lineBetween(5, 0, 13, 0)
+    graphics.lineBetween(0, -13, 0, -5)
+    graphics.lineBetween(0, 5, 0, 13)
+    this.crosshair = this.add.container(0, 0, [graphics]).setDepth(150).setVisible(false)
   }
 
   private createEnemyRenderPool(): void {
@@ -205,7 +288,7 @@ export class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(16, 14, '', style).setDepth(100)
     this.timerText = this.add.text(480, 14, '', style).setOrigin(0.5, 0).setDepth(100)
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
-    this.add.text(16, 510, 'WASD MOVE  •  AUTO-SLASH  •  R RESTART  •  SURVIVE', { ...style, fontSize: '12px', color: '#a998b6' }).setDepth(100)
+    this.add.text(16, 510, 'WASD MOVE  •  MOUSE AIM  •  LMB SLASH  •  RMB STAB  •  R RESTART', { ...style, fontSize: '12px', color: '#a998b6' }).setDepth(100)
   }
 
   private createPlaceholderTextures(): void {
@@ -246,6 +329,8 @@ export class GameScene extends Phaser.Scene {
   private restartRun(): void {
     this.state = new GameState(0xa11e1)
     this.hitStopMs = 0
+    this.queuedSlash = false
+    this.queuedStab = false
     this.gore.resetTransient()
     this.endedText?.destroy()
     this.endedText = undefined

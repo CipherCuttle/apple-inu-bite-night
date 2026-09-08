@@ -1,3 +1,5 @@
+import type { AttackKind } from '../game/combat/Sword'
+
 export class Sfx {
   private context?: AudioContext
   private noise?: AudioBuffer
@@ -11,7 +13,7 @@ export class Sfx {
     if (this.context.state === 'suspended') void this.context.resume()
   }
 
-  sword(): void {
+  sword(kind: AttackKind = 'slash'): void {
     const ctx = this.context
     if (!ctx) return
 
@@ -19,16 +21,16 @@ export class Sfx {
     const gain = ctx.createGain()
     const now = ctx.currentTime
 
-    oscillator.type = 'sawtooth'
-    oscillator.frequency.setValueAtTime(360, now)
-    oscillator.frequency.exponentialRampToValueAtTime(92, now + 0.075)
+    oscillator.type = kind === 'stab' ? 'triangle' : 'sawtooth'
+    oscillator.frequency.setValueAtTime(kind === 'stab' ? 230 : 390, now)
+    oscillator.frequency.exponentialRampToValueAtTime(kind === 'stab' ? 74 : 96, now + (kind === 'stab' ? 0.055 : 0.082))
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.035, now + 0.006)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08)
+    gain.gain.exponentialRampToValueAtTime(kind === 'stab' ? 0.042 : 0.034, now + 0.006)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'stab' ? 0.07 : 0.09))
 
     oscillator.connect(gain).connect(ctx.destination)
     oscillator.start(now)
-    oscillator.stop(now + 0.085)
+    oscillator.stop(now + (kind === 'stab' ? 0.075 : 0.095))
   }
 
   hit(weight: 'light' | 'heavy' | 'massacre'): void {
