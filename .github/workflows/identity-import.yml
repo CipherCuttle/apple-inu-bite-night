@@ -1,0 +1,63 @@
+name: identity-import-v0
+
+on:
+  push:
+    branches: [phase-1/combat-toy-v0]
+    paths:
+      - .github/workflows/identity-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Fetch exact vetted archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/bite-assets
+          cd /tmp/bite-assets
+          curl -fL --retry 3 -o zombies.zip 'https://opengameart.org/sites/default/files/FreeArt_Topdown_Zombies_0.zip'
+          curl -fL --retry 3 -o anatomy.zip 'https://opengameart.org/sites/default/files/topdown1_tutorial_art.zip'
+          curl -fL --retry 3 -o gore.zip 'https://opengameart.org/sites/default/files/rc_art_-_gore_blood_gibs.zip'
+          curl -fL --retry 3 -o blood.zip 'https://opengameart.org/sites/default/files/bloodsplat.zip'
+          printf '%s  %s\n' \
+            '979cba6b4e64fd10f496ca56f4576ad379e91ef00616c617366bf53d002964b2' zombies.zip \
+            '1841dc406f58360a55ac9256345ba68635f0e0840d273091de8785fc66598c88' anatomy.zip \
+            '59917f2f8aec67316aff9869000d11e19e68b296b7f8f9deb606c587b09c6af5' gore.zip \
+            '386d47da0f6d4b1ce699ef049f204bbec1c6a9312e7efbaab15bd3992f23816f' blood.zip | sha256sum -c -
+      - name: Build canonical identity assets and patch runtime
+        run: |
+          python -m pip install --disable-pip-version-check pillow numpy cairosvg
+          python scripts/apply-identity-v0.py /tmp/bite-assets
+      - name: Verify full project
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+          pnpm test:determinism
+      - name: Commit verified identity pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/identity-import.yml .github/workflows/asset-discovery.yml scripts/apply-identity-v0.py
+          git add public/assets src tests licenses docs
+          git commit -m 'feat: add Apple Inu and zombie identity v0'
+          git push origin HEAD:phase-1/combat-toy-v0
