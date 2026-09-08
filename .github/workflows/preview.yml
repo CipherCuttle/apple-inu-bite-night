@@ -31,7 +31,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --orphan preview-dist
-          git rm -rf .
           cp -R /tmp/bite-night-dist/. .
           touch .nojekyll
           printf '%s\n' "${GITHUB_SHA}" > BUILD_SHA
