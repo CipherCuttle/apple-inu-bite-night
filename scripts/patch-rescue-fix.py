@@ -24,6 +24,14 @@ s = s.replace(
     "    const label = kind === 'frenzy' ? 'CUT FRENZY' : kind === 'freeze' ? 'TIME FREEZE' : 'APPLE JUICE +HP'\n",
     "    const label = 'LAST BITE // SAVED'\n",
 )
+s = s.replace(
+    "  private showBulletTime(event: Extract<SimEvent, { type: 'bullet-time' }>): void {\n",
+    "  private showBulletTime(_event: Extract<SimEvent, { type: 'bullet-time' }>): void {\n",
+)
+s = s.replace(
+    "  private showPowerupPickup(kind: PowerupKind): void {\n",
+    "  private showPowerupPickup(_kind: PowerupKind): void {\n",
+)
 
 # Phaser Graphics does not expose cubic bezier path methods in the current typed API.
 # At gameplay scale a deliberately faceted apple-logo silhouette is clearer anyway.
@@ -42,3 +50,7 @@ s = s.replace(
     "obstacle: { id: number; x: number; y: number; width: number; height: number }",
 )
 p.write_text(s)
+
+# The old movement regression assumed an empty arena and required the player to reach the outer wall.
+# With level geometry the correct invariant is forward progress + no arena escape + no building penetration.
+Path('tests/movement.test.ts').write_text('''import { describe, expect, it } from 'vitest'\nimport { ARENA_BOUNDS, GameState } from '../src/game/sim/GameState'\nimport { CITY_LEVEL_OBSTACLES, circleOverlapsObstacle } from '../src/game/world/Level'\n\ndescribe('player arena bounds', () => {\n  it('keeps authoritative movement inside the arena and outside city obstacles', () => {\n    const state = new GameState(123)\n    state.player.hp = 999\n    const startX = state.player.x\n\n    for (let tick = 0; tick < 300; tick += 1) state.step({ x: 1, y: 0 })\n    expect(state.player.x).toBeGreaterThan(startX)\n    expect(Math.abs(state.player.x)).toBeLessThanOrEqual(ARENA_BOUNDS.halfWidth)\n    expect(Math.abs(state.player.y)).toBeLessThanOrEqual(ARENA_BOUNDS.halfHeight)\n    expect(CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(state.player.x, state.player.y, 14, obstacle))).toBe(false)\n\n    for (let tick = 0; tick < 300; tick += 1) state.step({ x: 0, y: 1 })\n    expect(Math.abs(state.player.x)).toBeLessThanOrEqual(ARENA_BOUNDS.halfWidth)\n    expect(Math.abs(state.player.y)).toBeLessThanOrEqual(ARENA_BOUNDS.halfHeight)\n    expect(CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(state.player.x, state.player.y, 14, obstacle))).toBe(false)\n  })\n})\n''')
