@@ -114,6 +114,16 @@ export function openMazeCenters(): MazePoint[] {
   return points
 }
 
+export function mazeWallCells(): MazeCell[] {
+  const cells: MazeCell[] = []
+  for (let row = 0; row < MAZE_ROWS; row += 1) {
+    for (let col = 0; col < MAZE_COLS; col += 1) {
+      if (MAZE_GRID[row][col] === '#') cells.push({ row, col })
+    }
+  }
+  return cells
+}
+
 export function mazeExitReached(x: number, y: number, radius = 26): boolean {
   const dx = x - MAZE_EXIT.x
   const dy = y - MAZE_EXIT.y
