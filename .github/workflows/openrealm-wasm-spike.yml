@@ -46,6 +46,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_menu_abi.py
           python3 ../spike/wasm/patch_wasm_init_trace.py
           python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
+          python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
           git diff --check
           git diff --stat
 
