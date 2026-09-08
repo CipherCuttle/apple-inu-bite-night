@@ -1,5 +1,7 @@
 import { isPointInSwordArc, normalizeAngle, type AttackKind } from '../combat/Sword'
+import { createDodgeState, dodgeHasTravel, dodgeIsInvulnerable, type DodgeState } from '../build/Dodge'
 import { heroDefinition, type HeroDefinition } from '../build/Hero'
+import { createStamina, regenerateStamina, spendStamina, staminaRatio, type Stamina } from '../build/Stamina'
 import { DEFAULT_LOADOUT, loadoutFingerprint, validateLoadout, type Loadout } from '../build/Loadout'
 import { weaponAttackForInput, type WeaponId } from '../build/Weapon'
 import { StyleMeter, type StyleRank } from '../combat/StyleMeter'
@@ -29,6 +31,7 @@ export interface InputState {
   dashHeld?: boolean
   dashReleased?: boolean
   whirlwind?: boolean
+  dodge?: boolean
 }
 
 export interface PlayerState {
@@ -54,6 +57,9 @@ export type SimEvent =
       distance?: number
     }
   | { type: 'dash-step'; tick: number; x: number; y: number; facing: number; power: number }
+  | { type: 'dodge-start'; tick: number; x: number; y: number; facing: number }
+  | { type: 'dodge-step'; tick: number; x: number; y: number; facing: number; invulnerable: boolean }
+  | { type: 'dodge-end'; tick: number; x: number; y: number; facing: number }
   | {
       type: 'enemy-hit'
       attack: AttackKind
@@ -148,6 +154,7 @@ export class GameState {
   readonly rng: XorShift32
   readonly loadout: Loadout
   readonly hero: HeroDefinition
+  readonly stamina: Stamina
   readonly enemies = new EnemyPool(220)
   readonly props: PropState[] = createImpactProps()
   readonly style = new StyleMeter()
@@ -168,12 +175,14 @@ export class GameState {
   private nextAttackTick = 0
   private dashChargeTicks = 0
   private dashState: DashState | null = null
+  private dodgeState: DodgeState | null = null
 
   constructor(seed: number, loadout: Loadout = DEFAULT_LOADOUT) {
     this.seed = seed >>> 0
     this.rng = new XorShift32(seed)
     this.loadout = validateLoadout(loadout)
     this.hero = heroDefinition(this.loadout.heroId)
+    this.stamina = createStamina(this.hero.staminaProfile)
     this.player = { x: MAZE_START.x, y: MAZE_START.y, facing: 0, hp: this.hero.baseStats.maxHp, invulnerableTicks: 0 }
     this.ensurePopulation()
   }
@@ -186,8 +195,15 @@ export class GameState {
     const decayedRank = this.style.tick()
     if (decayedRank) this.events.push({ type: 'style-rank', tick: this.tick, rank: decayedRank, label: this.style.label(), total: this.style.points })
     this.updateComboAndBuffTimers()
+    regenerateStamina(this.stamina, this.tick)
     this.updateDashCharge(input)
-    this.updatePlayer(input)
+    if (this.dodgeState) {
+      this.advanceDodge()
+    } else {
+      this.tryStartDodge(input)
+      if (this.dodgeState) this.advanceDodge()
+      else this.updatePlayer(input)
+    }
 
     const worldStepsThisTick = this.bulletTimeTicks <= 0 || this.tick % LAST_CHANCE_WORLD_DIVISOR === 0
     if (worldStepsThisTick) {
@@ -196,7 +212,9 @@ export class GameState {
       this.resolveEnemyPropCollisions()
     }
 
-    if (this.dashState) {
+    if (this.dodgeState) {
+      // Dodge travel/recovery owns the action slot for this tick.
+    } else if (this.dashState) {
       this.advanceDash()
     } else {
       this.tryWeaponAttack(input)
@@ -234,6 +252,14 @@ export class GameState {
   dashTicksRemaining(): number {
     return this.dashState?.remainingTicks ?? 0
   }
+
+  isDodging(): boolean { return this.dodgeState !== null }
+  dodgeTicksRemaining(): number { return this.dodgeState ? Math.max(0, this.dodgeState.totalTicks - this.dodgeState.elapsedTicks) : 0 }
+  dodgeInvulnerable(): boolean { return this.dodgeState?.invulnerableThisTick ?? false }
+  staminaCurrent(): number { return this.stamina.current }
+  staminaMax(): number { return this.stamina.max }
+  staminaProgress(): number { return staminaRatio(this.stamina) }
+  staminaRegenLockedTicks(): number { return Math.max(0, this.stamina.lockedUntilTick - this.tick) }
 
   comboMultiplier(): number { return this.style.scoreMultiplier() }
   styleRank(): StyleRank { return this.style.rank() }
@@ -282,9 +308,26 @@ export class GameState {
     feed(this.player.hp)
     feed(this.nextAttackTick)
     feed(this.dashChargeTicks)
+    feed(this.stamina.current)
+    feed(this.stamina.max)
+    feed(this.stamina.lockedUntilTick)
     feed(this.rng.snapshot())
     const fingerprint = loadoutFingerprint(this.loadout)
     for (let i = 0; i < fingerprint.length; i += 1) feed(fingerprint.charCodeAt(i))
+
+    if (this.dodgeState) {
+      feed(1)
+      feed(this.dodgeState.facing)
+      feed(this.dodgeState.elapsedTicks)
+      feed(this.dodgeState.totalTicks)
+      feed(this.dodgeState.travelTicks)
+      feed(this.dodgeState.stepX)
+      feed(this.dodgeState.stepY)
+      feed(this.dodgeState.blocked ? 1 : 0)
+      feed(this.dodgeState.invulnerableThisTick ? 1 : 0)
+    } else {
+      feed(0)
+    }
 
     if (this.dashState) {
       feed(1)
@@ -334,8 +377,49 @@ export class GameState {
     return hash.toString(16).padStart(8, '0')
   }
 
+  private tryStartDodge(input: InputState): void {
+    if (!input.dodge || this.dodgeState || this.dashState || input.dashHeld || this.tick < this.nextAttackTick) return
+    if (!spendStamina(this.stamina, this.hero.dodgeProfile.staminaCost, this.tick)) return
+    const length = Math.hypot(input.x, input.y)
+    const facing = length > 0.0001
+      ? Math.atan2(input.y, input.x)
+      : Number.isFinite(input.aimRadians)
+        ? normalizeAngle(input.aimRadians as number)
+        : this.player.facing
+    this.player.facing = facing
+    this.dodgeState = createDodgeState(this.hero.dodgeProfile, facing)
+    this.dashChargeTicks = 0
+    this.events.push({ type: 'dodge-start', tick: this.tick, x: this.player.x, y: this.player.y, facing })
+  }
+
+  private advanceDodge(): void {
+    const dodge = this.dodgeState
+    if (!dodge) return
+    if (dodgeHasTravel(dodge)) {
+      const startX = this.player.x
+      const startY = this.player.y
+      const endX = clamp(startX + dodge.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
+      const endY = clamp(startY + dodge.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
+      if (mazeCanOccupy(endX, endY, this.hero.movementProfile.collisionRadius) && !this.playerOverlapsProp(endX, endY)) {
+        this.player.x = endX
+        this.player.y = endY
+      } else {
+        dodge.blocked = true
+      }
+    }
+    const invulnerable = dodgeIsInvulnerable(dodge, this.hero.dodgeProfile)
+    dodge.invulnerableThisTick = invulnerable
+    this.events.push({ type: 'dodge-step', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing, invulnerable })
+    dodge.elapsedTicks += 1
+    if (dodge.elapsedTicks >= dodge.totalTicks) {
+      this.events.push({ type: 'dodge-end', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing })
+      this.dodgeState = null
+      this.nextAttackTick = Math.max(this.nextAttackTick, this.tick + 1)
+    }
+  }
+
   private updateDashCharge(input: InputState): void {
-    if (this.dashState) {
+    if (this.dashState || this.dodgeState) {
       this.dashChargeTicks = 0
       return
     }
@@ -550,6 +634,7 @@ export class GameState {
     if (!attack || input.dashHeld || this.tick < this.nextAttackTick) return
 
     const config = weaponAttackForInput(this.loadout.weaponId, attack)
+    if (!spendStamina(this.stamina, config.staminaCost, this.tick)) return
     this.nextAttackTick = this.tick + this.scaledCooldown(config.cooldownTicks)
     this.events.push({ type: 'weapon-attack', weaponId: this.loadout.weaponId, attack, tick: this.tick, x: this.player.x, y: this.player.y, facing: this.player.facing })
 
@@ -572,6 +657,7 @@ export class GameState {
 
   private beginDash(chargeTicks: number): void {
     const config = weaponAttackForInput(this.loadout.weaponId, 'dash')
+    if (!spendStamina(this.stamina, config.staminaCost, this.tick)) return
     const power = Math.min(1, Math.max(0, chargeTicks) / MAX_DASH_CHARGE_TICKS)
     const requestedDistance = DASH_MIN_DISTANCE + DASH_MAX_BONUS_DISTANCE * power
     const startX = this.player.x
@@ -817,7 +903,7 @@ export class GameState {
   }
 
   private resolveEnemyContact(): void {
-    if (this.player.invulnerableTicks > 0 || this.dashState) return
+    if (this.player.invulnerableTicks > 0 || this.dashState || this.dodgeInvulnerable()) return
 
     for (const enemy of this.enemies.items) {
       if (!enemy.active) continue

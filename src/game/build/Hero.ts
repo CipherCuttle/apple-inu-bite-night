@@ -1,4 +1,5 @@
 import type { AbilityId } from './Ability'
+import type { DodgeProfile } from './Dodge'
 import type { StaminaProfile } from './Stamina'
 import type { WeaponId } from './Weapon'
 
@@ -30,6 +31,7 @@ export interface HeroDefinition {
   defaultWeapon: WeaponId
   movementProfile: MovementProfile
   staminaProfile: StaminaProfile
+  dodgeProfile: DodgeProfile
   presentation: HeroPresentation
   unlockCondition?: string
 }
@@ -44,6 +46,14 @@ export const HERO_REGISTRY: Readonly<Record<HeroId, HeroDefinition>> = {
     defaultWeapon: 'mouthblade',
     movementProfile: { speed: 3.25, collisionRadius: 14 },
     staminaProfile: { max: 100, regenPerTick: 1.15, regenDelayTicks: 24 },
+    dodgeProfile: {
+      staminaCost: 24,
+      distance: 78,
+      travelTicks: 8,
+      recoveryTicks: 4,
+      iframeStartTick: 1,
+      iframeEndTick: 6,
+    },
     presentation: {
       headTexture: 'apple-inu-head',
       weaponTexture: 'apple-inu-sword',
