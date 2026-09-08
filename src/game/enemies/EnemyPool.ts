@@ -14,8 +14,12 @@ export class EnemyPool {
       hp: 1,
       speed: 0,
       radius: 12,
+      mass: 1,
       vx: 0,
       vy: 0,
+      impulseX: 0,
+      impulseY: 0,
+      staggerTicks: 0,
     }))
   }
 
@@ -31,15 +35,20 @@ export class EnemyPool {
 
     const angle = rng.range(-Math.PI, Math.PI)
     const radius = rng.range(radiusMin, radiusMax)
+    const heavy = rng.next() < 0.22
     enemy.id = this.nextId++
     enemy.active = true
     enemy.x = playerX + Math.cos(angle) * radius
     enemy.y = playerY + Math.sin(angle) * radius
-    enemy.hp = 1
-    enemy.speed = rng.range(0.75, 1.15)
-    enemy.radius = rng.range(10, 14)
+    enemy.hp = heavy ? 2 : 1
+    enemy.speed = heavy ? rng.range(0.62, 0.9) : rng.range(0.8, 1.2)
+    enemy.radius = heavy ? rng.range(13, 16) : rng.range(10, 13)
+    enemy.mass = heavy ? rng.range(1.45, 1.8) : rng.range(0.85, 1.15)
     enemy.vx = 0
     enemy.vy = 0
+    enemy.impulseX = 0
+    enemy.impulseY = 0
+    enemy.staggerTicks = 0
     return enemy
   }
 
@@ -47,5 +56,8 @@ export class EnemyPool {
     enemy.active = false
     enemy.vx = 0
     enemy.vy = 0
+    enemy.impulseX = 0
+    enemy.impulseY = 0
+    enemy.staggerTicks = 0
   }
 }
