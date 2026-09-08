@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="${1:-$PWD/open-realm}"
+cd "$ROOT"
+
+UPSTREAM_SHA="cf12357883950c14abce8d636596952c3fc547bb"
+ACTUAL_SHA="$(git rev-parse HEAD)"
+if [[ "$ACTUAL_SHA" != "$UPSTREAM_SHA" ]]; then
+  echo "wrong upstream revision: expected $UPSTREAM_SHA got $ACTUAL_SHA" >&2
+  exit 2
+fi
+
+mkdir -p build-wasm build-wasm/obj build/share
+
+# Generate the system-font header with the native host compiler. This is a
+# build-time transformation only; the browser runtime remains fully wasm.
+gcc -O2 tools/img2sysfont.c -o build-wasm/img2sysfont
+build-wasm/img2sysfont renderer/conchars.pcx renderer/conchars_sysfont.h conchars_sysfont_pcx
+
+# Preserve OpenRealm's unity-module boundaries while replacing native shared
+# objects with wasm objects that are linked into one browser executable.
+python3 - <<'PY'
+from pathlib import Path
+
+root = Path('.')
+out = Path('build-wasm')
+
+def sources(*dirs, exclude=()):
+    found = []
+    for d in dirs:
+        for p in Path(d).rglob('*.c'):
+            rel = p.as_posix()
+            if any(rel.endswith(x) for x in exclude):
+                continue
+            found.append(rel)
+    return sorted(set(found))
+
+def write(name, items, extra=()):
+    paths = list(items) + list(extra)
+    text = ''.join(f'#include "../{p}"\n' for p in paths)
+    (out / f'unity_{name}.c').write_text(text)
+    print(name, len(paths), 'sources')
+
+write('shared', sources('shared'))
+write('jass', sources('games/warcraft-3/jass'))
+write('sheet', [
+    'games/warcraft-3/sheet/parser.c',
+    'games/warcraft-3/sheet/sheet.c',
+])
+write('renderer', sources('renderer', 'games/warcraft-3/renderer'), extra=['common/mpq.c'])
+write('game', sources('games/warcraft-3/game', 'games/warcraft-3/common', exclude=('world_w3.c', 'routing.c')), extra=['common/mpq.c'])
+write('menu', sources('games/warcraft-3/menu', 'games/warcraft-3/common', exclude=('world_w3.c', 'routing.c')), extra=['common/mpq.c'])
+write('app', sources('client', 'server', 'common', 'sound', exclude=('stb_vorbis.c',)))
+PY
+
+COMMON_FLAGS=(
+  -O1
+  -Wall
+  -Wno-unused-function
+  -Wno-unused-variable
+  -fno-common
+  -I.
+  -Ishared
+  -Ishared/types
+  -Igames/warcraft-3
+  -Igames/warcraft-3/common
+  -DWC3
+  -DUSE_FOGOFWAR
+  '-DBZ_GAME="warcraft-3"'
+  -DBZ_GL_ES3
+  -DBZ_MSAA_SAMPLES=0
+)
+
+compile_unity() {
+  local name="$1"; shift
+  echo "[wasm:$name]"
+  emcc "${COMMON_FLAGS[@]}" "$@" -c "build-wasm/unity_${name}.c" -o "build-wasm/obj/${name}.o"
+}
+
+compile_unity shared
+compile_unity jass
+compile_unity sheet
+compile_unity renderer
+compile_unity game -DSTB_FDF_IMPLEMENTATION -DSTB_FDF_GLOBALS
+compile_unity menu -DSTB_FDF_IMPLEMENTATION -DSTB_FDF_GLOBALS
+compile_unity app
+
+# Copy engine-owned, redistributable config/font assets only. No Warcraft III
+# retail archives or proprietary map data are embedded by this spike.
+cp -R share/. build/share/
+mkdir -p build/share/warcraft-3
+cp -R games/warcraft-3/share/. build/share/warcraft-3/
+
+cat > build-wasm/shell.html <<'HTML'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenRealm WebAssembly Spike</title>
+  <style>
+    html,body{margin:0;background:#08070b;color:#ddd;font-family:monospace;height:100%}
+    #status{position:fixed;z-index:3;left:12px;top:10px;background:#000a;padding:8px 10px}
+    canvas{display:block;width:100vw;height:100vh}
+  </style>
+</head>
+<body>
+<div id="status">booting OpenRealm wasm…</div>
+<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+<script>
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    print: (...args) => console.log(...args),
+    printErr: (...args) => console.error(...args),
+    setStatus: (text) => { document.getElementById('status').textContent = text || 'OpenRealm wasm running'; },
+    onRuntimeInitialized: () => { document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; }
+  };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
+HTML
+
+emcc \
+  build-wasm/obj/app.o \
+  build-wasm/obj/shared.o \
+  build-wasm/obj/jass.o \
+  build-wasm/obj/sheet.o \
+  build-wasm/obj/renderer.o \
+  build-wasm/obj/game.o \
+  build-wasm/obj/menu.o \
+  -o build-wasm/openrealm.html \
+  -sUSE_SDL=2 \
+  -sUSE_ZLIB=1 \
+  -sFULL_ES3=1 \
+  -sMIN_WEBGL_VERSION=2 \
+  -sMAX_WEBGL_VERSION=2 \
+  -sALLOW_MEMORY_GROWTH=1 \
+  -sASSERTIONS=1 \
+  -sEXIT_RUNTIME=0 \
+  -sENVIRONMENT=web \
+  -sFORCE_FILESYSTEM=1 \
+  --preload-file build/share@/share \
+  --shell-file build-wasm/shell.html \
+  -Wl,--allow-multiple-definition
+
+ls -lh build-wasm/openrealm.html build-wasm/openrealm.js build-wasm/openrealm.wasm build-wasm/openrealm.data
+printf 'OPENREALM_ENGINE_LINK=PASS\n'
