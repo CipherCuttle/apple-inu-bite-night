@@ -4,7 +4,7 @@ import { buttonToAttack, toLogicalPointer } from '../src/game/input/DesktopComba
 describe('desktop combat input helpers', () => {
   it('maps native mouse buttons to the intended melee attacks', () => {
     expect(buttonToAttack(0)).toBe('slash')
-    expect(buttonToAttack(2)).toBe('stab')
+    expect(buttonToAttack(2)).toBe('dash')
     expect(buttonToAttack(1)).toBeNull()
   })
 
