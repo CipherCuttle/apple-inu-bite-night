@@ -18,8 +18,8 @@ jobs:
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v10
         with:
-          version: latest
-          actions-cache-folder: emsdk-cache
+          version: 6.0.9
+          no-cache: true
 
       - name: Record toolchain
         run: |
