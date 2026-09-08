@@ -9,6 +9,18 @@ if "__wasm_smoke__" not in text:
     raise SystemExit("expected wasm smoke map argument in generated shell")
 text = text.replace("__wasm_smoke__", "__hero_line_wars__")
 
+# Emscripten creates callable-looking native wrappers before the Wasm runtime is
+# ready. Make readiness explicit at the existing lifecycle boundary so neither
+# HUD polling nor user input can invoke a native export early.
+runtime_hook = "onRuntimeInitialized: () => { document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; },"
+if text.count(runtime_hook) != 1:
+    raise SystemExit("generated shell runtime hook anchor missing")
+text = text.replace(
+    runtime_hook,
+    "onRuntimeInitialized: () => { window.__HLW_RUNTIME_READY = true; document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; },",
+    1,
+)
+
 style = r'''
 <style id="hlw-style">
   #status{top:auto;bottom:10px;left:12px;opacity:.55;font-size:11px;pointer-events:none}
@@ -56,8 +68,10 @@ script = r'''
 <script id="hlw-bridge">
 (() => {
   const byId = id => document.getElementById(id);
+  const ready = () => window.__HLW_RUNTIME_READY === true && window.Module;
   const call = (name, ...args) => {
-    const fn = window.Module && window.Module['_' + name];
+    if (!ready()) return 0;
+    const fn = window.Module['_' + name];
     return typeof fn === 'function' ? fn(...args) : 0;
   };
   const movement = {a:0,d:1,w:2,s:3};
@@ -73,23 +87,23 @@ script = r'''
   window.addEventListener('keydown', e => {
     const key = e.key.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(movement, key)) {
-      call('HLW_SetMove', movement[key], 1); e.preventDefault(); return;
+      if (ready()) call('HLW_SetMove', movement[key], 1); e.preventDefault(); return;
     }
     if (e.repeat) return;
-    if (key === '1' || key === '2' || key === '3') { send(Number(key) - 1); e.preventDefault(); }
-    else if (key === 'q') { nova(); e.preventDefault(); }
-    else if (key === 'r') { reset(); e.preventDefault(); }
+    if (key === '1' || key === '2' || key === '3') { if (ready()) send(Number(key) - 1); e.preventDefault(); }
+    else if (key === 'q') { if (ready()) nova(); e.preventDefault(); }
+    else if (key === 'r') { if (ready()) reset(); e.preventDefault(); }
   }, {passive:false});
   window.addEventListener('keyup', e => {
     const key = e.key.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(movement, key)) {
-      call('HLW_SetMove', movement[key], 0); e.preventDefault();
+      if (ready()) call('HLW_SetMove', movement[key], 0); e.preventDefault();
     }
   }, {passive:false});
-  window.addEventListener('blur', () => { for (let i=0;i<4;i++) call('HLW_SetMove', i, 0); });
+  window.addEventListener('blur', () => { if (ready()) for (let i=0;i<4;i++) call('HLW_SetMove', i, 0); });
 
   function refresh(){
-    if (!window.Module || typeof window.Module._HLW_GetGold !== 'function') return;
+    if (!ready() || typeof window.Module._HLW_GetGold !== 'function') return;
     if (!bridgeReadyLogged) { console.log('HERO_LINE_WARS_BROWSER_BRIDGE=READY'); bridgeReadyLogged = true; }
     byId('hlw-gold').textContent = call('HLW_GetGold');
     byId('hlw-income').textContent = call('HLW_GetIncome');
@@ -110,7 +124,7 @@ script = r'''
     else result.style.display = 'none';
   }
   setInterval(refresh, 100);
-  window.HLW = {send, nova, reset, call, refresh};
+  window.HLW = {send, nova, reset, call, refresh, ready};
 })();
 </script>
 '''
