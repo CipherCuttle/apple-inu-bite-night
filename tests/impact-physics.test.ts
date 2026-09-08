@@ -21,44 +21,63 @@ function isolateEnemy(state: GameState, index = 0) {
 }
 
 describe('impact physics v0', () => {
-  it('converts a launched enemy hitting the arena wall into secondary damage', () => {
+  it('turns an actual slash into a delayed wall-slam kill', () => {
     const state = new GameState(11)
     state.player.hp = 999
+    state.player.x = 340
     const enemy = isolateEnemy(state)
-    enemy.x = ARENA_BOUNDS.halfWidth - enemy.radius - 1
-    enemy.impulseX = 8
+    enemy.x = ARENA_BOUNDS.halfWidth - enemy.radius - 13
+    enemy.y = 0
+    const targetId = enemy.id
 
-    state.step({ x: 0, y: 0, aimRadians: 0 })
+    state.step({ x: 0, y: 0, aimRadians: 0, slash: true })
+    expect(state.events.some((event) => event.type === 'enemy-hit' && event.enemyId === targetId && !event.killed)).toBe(true)
 
-    expect(state.events.some((event) => event.type === 'physics-impact' && event.kind === 'wall' && event.enemyId === enemy.id)).toBe(true)
-    expect(enemy.hp).toBe(1)
-    expect(enemy.impulseX).toBeLessThan(0)
+    let wallSlammed = false
+    for (let tick = 0; tick < 12 && !wallSlammed; tick += 1) {
+      state.step({ x: 0, y: 0, aimRadians: 0 })
+      wallSlammed = state.events.some(
+        (event) => event.type === 'physics-impact' && event.kind === 'wall' && event.enemyId === targetId && event.killed,
+      )
+    }
+
+    expect(wallSlammed).toBe(true)
   })
 
-  it('transfers momentum between overlapping enemies and can cause collision damage', () => {
+  it('turns an actual slash into enemy-to-enemy collision damage', () => {
     const state = new GameState(12)
     state.player.hp = 999
-    const a = isolateEnemy(state, 0)
-    const b = state.enemies.items[1]
-    b.active = true
-    b.id = 2
-    b.x = 18
-    b.y = 0
-    b.hp = 2
-    b.speed = 0
-    b.radius = 12
-    b.mass = 1
-    b.vx = 0
-    b.vy = 0
-    b.impulseX = 0
-    b.impulseY = 0
-    b.staggerTicks = 0
-    a.impulseX = 8
+    const launched = isolateEnemy(state, 0)
+    launched.x = 92
+    const launchedId = launched.id
 
-    state.step({ x: 0, y: 0, aimRadians: Math.PI / 2 })
+    const target = state.enemies.items[1]
+    target.active = true
+    target.id = 2
+    target.x = 132
+    target.y = 0
+    target.hp = 2
+    target.speed = 0
+    target.radius = 12
+    target.mass = 1
+    target.vx = 0
+    target.vy = 0
+    target.impulseX = 0
+    target.impulseY = 0
+    target.staggerTicks = 0
+    const targetId = target.id
 
-    expect(b.impulseX).toBeGreaterThan(0)
-    expect(state.events.some((event) => event.type === 'physics-impact' && event.kind === 'enemy')).toBe(true)
+    state.step({ x: 0, y: 0, aimRadians: 0, slash: true })
+    expect(state.events.some((event) => event.type === 'enemy-hit' && event.enemyId === launchedId)).toBe(true)
+    expect(state.events.some((event) => event.type === 'enemy-hit' && event.enemyId === targetId)).toBe(false)
+
+    let collided = false
+    for (let tick = 0; tick < 12 && !collided; tick += 1) {
+      state.step({ x: 0, y: 0, aimRadians: 0 })
+      collided = state.events.some((event) => event.type === 'physics-impact' && event.kind === 'enemy')
+    }
+
+    expect(collided).toBe(true)
   })
 
   it('lets the sword destroy a deterministic glass prop', () => {
