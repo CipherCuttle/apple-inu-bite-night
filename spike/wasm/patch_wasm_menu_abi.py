@@ -30,10 +30,32 @@ replacement = '''menuImport_t mi;
 LPCPLAYER menu_player;
 
 #ifdef __EMSCRIPTEN__
-/* The native menu ABI exports a variadic Printf callback. Wasm validates
- * indirect-call signatures strictly, and that cross-module varargs edge traps
- * before menu asset loading. Keep logging local to the monolithic browser
- * module instead of enabling global function-pointer cast emulation. */
+/* The native menu ABI is a shared-library boundary built from function tables.
+ * In the browser spike those modules are linked into one Wasm executable, where
+ * indirect calls are signature-checked. Keep the small boot-critical host
+ * surface on direct Wasm calls rather than globally emulating function-pointer
+ * casts and hiding future ABI defects. */
+int FS_ReadFileQ3(LPCSTR filename, void **buf);
+void FS_FreeFile(void *buf);
+HANDLE MemAlloc(long size);
+void MemFree(HANDLE mem);
+
+static int M_WasmFSReadFile(LPCSTR fileName, void **buf) {
+    return FS_ReadFileQ3(fileName, buf);
+}
+
+static void M_WasmFSFreeFile(void *buf) {
+    FS_FreeFile(buf);
+}
+
+static HANDLE M_WasmMemAlloc(long size) {
+    return MemAlloc(size);
+}
+
+static void M_WasmMemFree(HANDLE mem) {
+    MemFree(mem);
+}
+
 static void M_WasmPrintf(LPCSTR fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -57,6 +79,10 @@ old_api = '''menuExport_t M_GetAPI(menuImport_t import) {
 new_api = '''menuExport_t M_GetAPI(menuImport_t import) {
     mi = import;
 #ifdef __EMSCRIPTEN__
+    mi.FS_ReadFile = M_WasmFSReadFile;
+    mi.FS_FreeFile = M_WasmFSFreeFile;
+    mi.MemAlloc = M_WasmMemAlloc;
+    mi.MemFree = M_WasmMemFree;
     mi.Printf = M_WasmPrintf;
 #endif
     
