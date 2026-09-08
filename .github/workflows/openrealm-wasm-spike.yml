@@ -43,6 +43,7 @@ jobs:
           python3 ../spike/wasm/patch_openrealm.py
           python3 ../spike/wasm/patch_wasm32_save.py
           python3 ../spike/wasm/patch_wasm_audio.py
+          python3 ../spike/wasm/patch_wasm_menu_abi.py
           python3 ../spike/wasm/patch_wasm_init_trace.py
           git diff --check
           git diff --stat
