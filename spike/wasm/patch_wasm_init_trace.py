@@ -67,4 +67,35 @@ count = text.count(old2)
 if count != 1:
     raise SystemExit(f"client/cl_main.c: expected one menu init sequence, got {count}")
 path.write_text(text.replace(old2, new2, 1))
+
+menu_path = Path("games/warcraft-3/menu/menu_main.c")
+menu_text = menu_path.read_text()
+menu_old = '''void M_Init(void) {
+    memset(&ui_state, 0, sizeof(ui_state));
+    UI_ResetGlueSceneModels();
+    UI_RegisterMenuCommands();
+    
+    mi.Printf("M_Init: loading FDF assets\\n");
+'''
+menu_new = '''void M_Init(void) {
+#ifdef __EMSCRIPTEN__
+    fprintf(stderr, "WASM_INIT_TRACE=m-init-entered\\n");
+#endif
+    memset(&ui_state, 0, sizeof(ui_state));
+    UI_ResetGlueSceneModels();
+#ifdef __EMSCRIPTEN__
+    fprintf(stderr, "WASM_INIT_TRACE=before-menu-command-registration cmd_add=%p\\n", (void *)mi.Cmd_AddCommand);
+#endif
+    UI_RegisterMenuCommands();
+#ifdef __EMSCRIPTEN__
+    fprintf(stderr, "WASM_INIT_TRACE=menu-command-registration-returned\\n");
+#endif
+    
+    mi.Printf("M_Init: loading FDF assets\\n");
+'''
+count = menu_text.count(menu_old)
+if count != 1:
+    raise SystemExit(f"games/warcraft-3/menu/menu_main.c: expected one M_Init sequence, got {count}")
+menu_path.write_text(menu_text.replace(menu_old, menu_new, 1))
+
 print("OpenRealm wasm init tracing applied")
