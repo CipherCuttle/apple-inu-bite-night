@@ -1,0 +1,67 @@
+name: phase3-review-fix
+
+on:
+  push:
+    branches: [phase-3/soulslike-stamina-dodge-v0]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-3/soulslike-stamina-dodge-v0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Fix current-tick dodge iframe authority
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/game/sim/GameState.ts')
+          text = path.read_text()
+
+          def once(old: str, new: str):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one match, got {count}: {old!r}')
+              text = text.replace(old, new, 1)
+
+          once(
+              "  dodgeInvulnerable(): boolean { return this.dodgeState ? dodgeIsInvulnerable(this.dodgeState, this.hero.dodgeProfile) : false }\n",
+              "  dodgeInvulnerable(): boolean { return this.dodgeState?.invulnerableThisTick ?? false }\n",
+          )
+          once(
+              "      feed(this.dodgeState.blocked ? 1 : 0)\n",
+              "      feed(this.dodgeState.blocked ? 1 : 0)\n      feed(this.dodgeState.invulnerableThisTick ? 1 : 0)\n",
+          )
+          once(
+              "    const invulnerable = dodgeIsInvulnerable(dodge, this.hero.dodgeProfile)\n    this.events.push({ type: 'dodge-step', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing, invulnerable })\n",
+              "    const invulnerable = dodgeIsInvulnerable(dodge, this.hero.dodgeProfile)\n    dodge.invulnerableThisTick = invulnerable\n    this.events.push({ type: 'dodge-step', tick: this.tick, x: this.player.x, y: this.player.y, facing: dodge.facing, invulnerable })\n",
+          )
+          path.write_text(text)
+          PY
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:determinism
+      - name: Commit hostile-review fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/game/sim/GameState.ts
+          git diff --cached --check
+          git commit -m "fix(phase3): honor sixth dodge iframe during contact"
+          git push
