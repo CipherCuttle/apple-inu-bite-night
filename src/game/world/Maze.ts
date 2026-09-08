@@ -38,7 +38,9 @@ export function mazeCellAt(x: number, y: number): MazeCell | null {
 }
 
 export function isMazeCellOpen(cell: MazeCell | null): boolean {
-  return !!cell && MAZE_GRID[cell.row][cell.col] !== '#'
+  if (!cell) return false
+  if (cell.row < 0 || cell.row >= MAZE_ROWS || cell.col < 0 || cell.col >= MAZE_COLS) return false
+  return MAZE_GRID[cell.row][cell.col] !== '#'
 }
 
 export function cellCenter(cell: MazeCell): MazePoint {
@@ -110,16 +112,6 @@ export function openMazeCenters(): MazePoint[] {
     }
   }
   return points
-}
-
-export function mazeWallCells(): MazeCell[] {
-  const cells: MazeCell[] = []
-  for (let row = 0; row < MAZE_ROWS; row += 1) {
-    for (let col = 0; col < MAZE_COLS; col += 1) {
-      if (MAZE_GRID[row][col] === '#') cells.push({ row, col })
-    }
-  }
-  return cells
 }
 
 export function mazeExitReached(x: number, y: number, radius = 26): boolean {
