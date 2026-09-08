@@ -99,6 +99,56 @@ cp -R share/. build/share/
 mkdir -p build/share/warcraft-3
 cp -R games/warcraft-3/share/. build/share/warcraft-3/
 
+# Gate-5 synthetic scene assets are generated exclusively from OpenRealm's own
+# test fixture sources and generators. The pseudo-map has no Blizzard archive.
+mkdir -p \
+  build/share/warcraft-3/Units \
+  build/share/warcraft-3/TestUI/Textures \
+  build/share/warcraft-3/TestUI/Models
+cp games/warcraft-3/tests/resources-src/Units/UnitBalance.slk \
+  build/share/warcraft-3/Units/UnitBalance.slk
+cp games/warcraft-3/tests/resources-src/Units/UnitUI.slk \
+  build/share/warcraft-3/Units/UnitUI.slk
+# Keep the historical lowercase lookup spelling available on a case-sensitive
+# Emscripten filesystem as well; both files contain identical source-owned data.
+cp games/warcraft-3/tests/resources-src/Units/UnitUI.slk \
+  build/share/warcraft-3/Units/unitUI.slk
+cat > build/share/warcraft-3/Units/UnitData.slk <<'SLK'
+ID;PWXL;N;E
+B;X4;Y2;D0
+C;X1;Y1;K"unitDataID"
+C;X2;K"collision"
+C;X3;K"movetp"
+C;X4;K"targType"
+C;X1;Y2;K"opeo"
+C;X2;K"16"
+C;X3;K"foot"
+C;X4;K"ground"
+E
+SLK
+
+gcc -O2 tools/blpgen.c -lm -o build-wasm/blpgen
+gcc -O2 tools/mdxgen.c -lm -o build-wasm/mdxgen
+build-wasm/blpgen checker 64 64 8 \
+  build/share/warcraft-3/TestUI/Textures/wasm_smoke_ground.blp
+build-wasm/blpgen alpha_ring 64 64 \
+  build/share/warcraft-3/TestUI/Textures/wasm_smoke_unit.blp
+build-wasm/mdxgen quad_sprite 'TestUI\\Textures\\wasm_smoke_ground.blp' \
+  build/share/warcraft-3/TestUI/Models/wasm_smoke_ground.mdx
+build-wasm/mdxgen anim_pulse 'TestUI\\Textures\\wasm_smoke_unit.blp' \
+  build/share/warcraft-3/TestUI/Models/anim_pulse.mdx
+for smoke_asset in \
+  build/share/warcraft-3/Units/UnitBalance.slk \
+  build/share/warcraft-3/Units/UnitData.slk \
+  build/share/warcraft-3/Units/UnitUI.slk \
+  build/share/warcraft-3/TestUI/Textures/wasm_smoke_ground.blp \
+  build/share/warcraft-3/TestUI/Textures/wasm_smoke_unit.blp \
+  build/share/warcraft-3/TestUI/Models/wasm_smoke_ground.mdx \
+  build/share/warcraft-3/TestUI/Models/anim_pulse.mdx; do
+  test -s "$smoke_asset"
+done
+printf 'OPENREALM_MAP_UNIT_SMOKE_ASSETS=PASS\n'
+
 cat > build-wasm/shell.html <<'HTML'
 <!doctype html>
 <html lang="en">
@@ -118,7 +168,7 @@ cat > build-wasm/shell.html <<'HTML'
 <script>
   var Module = {
     canvas: document.getElementById('canvas'),
-    arguments: ['-data', '/share'],
+    arguments: ['-data', '/share', '+map', '__wasm_smoke__'],
     print: (...args) => console.log(...args),
     printErr: (...args) => console.error(...args),
     setStatus: (text) => { document.getElementById('status').textContent = text || 'OpenRealm wasm running'; },
