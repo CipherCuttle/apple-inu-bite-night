@@ -174,7 +174,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     for (const event of events) {
-      if (event.type === 'sword-attack') {
+      if (event.type === 'weapon-attack') {
         this.animateSword(event)
         this.sfx.sword(event.attack)
       }
@@ -443,7 +443,7 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10)
   }
 
-  private animateSword(event: Extract<SimEvent, { type: 'sword-attack' }>): void {
+  private animateSword(event: Extract<SimEvent, { type: 'weapon-attack' }>): void {
     const attack: AttackKind = event.attack
     this.tweens.killTweensOf(this.headRig)
     this.tweens.killTweensOf(this.sword)
