@@ -2,9 +2,10 @@ import { isPointInSwordArc, normalizeAngle, swordForAttack, type AttackKind } fr
 import { EnemyPool } from '../enemies/EnemyPool'
 import type { EnemyState } from '../enemies/Enemy'
 import { createImpactProps, type PropMaterial, type PropState } from '../world/Props'
+import { CITY_LEVEL_OBSTACLES, circleOverlapsObstacle, pointInsideExpandedObstacle } from '../world/Level'
 import { XorShift32 } from './RNG'
 
-export type PowerupKind = 'frenzy' | 'freeze' | 'apple-juice'
+export type PowerupKind = 'last-bite'
 
 export interface PowerupState {
   id: number
@@ -83,7 +84,8 @@ export type SimEvent =
     }
   | { type: 'player-hit'; tick: number; hp: number }
   | { type: 'combo-tier'; tick: number; comboKills: number; multiplier: number; attackSpeed: number }
-  | { type: 'flow-freeze'; tick: number; durationTicks: number; source: 'combo' | 'powerup' }
+  | { type: 'bullet-time'; tick: number; durationTicks: number }
+  | { type: 'last-chance'; tick: number; powerupId: number; x: number; y: number }
   | { type: 'powerup-drop'; tick: number; powerupId: number; kind: PowerupKind; x: number; y: number }
   | { type: 'powerup-picked'; tick: number; powerupId: number; kind: PowerupKind }
   | { type: 'run-ended'; tick: number; kills: number }
@@ -117,14 +119,14 @@ const ENEMY_RESTITUTION = 0.42
 const PROP_RESTITUTION = 0.28
 export const MAX_DASH_CHARGE_TICKS = 60
 const COMBO_WINDOW_TICKS = 150
-const FLOW_FREEZE_EVERY_KILLS = 8
-const FLOW_FREEZE_TICKS = 36
-const POWERUP_DROP_EVERY_KILLS = 6
-const POWERUP_TTL_TICKS = 600
-const POWERUP_PICKUP_RADIUS = 28
-const FRENZY_TICKS = 360
-const FRENZY_ATTACK_SPEED = 1.45
-const POWERUP_FREEZE_TICKS = 90
+const LAST_BITE_TTL_TICKS = 240
+const POWERUP_PICKUP_RADIUS = 30
+const LAST_CHANCE_BULLET_TIME_TICKS = 150
+const LAST_CHANCE_WORLD_DIVISOR = 4
+const LAST_CHANCE_INVULNERABLE_TICKS = 60
+const LAST_BITE_HEAL = 2
+const LAST_BITE_FRENZY_TICKS = 120
+const LAST_BITE_ATTACK_SPEED = 1.25
 const PLAYER_MAX_HP = 5
 
 export const ARENA_BOUNDS = {
@@ -146,8 +148,9 @@ export class GameState {
   comboKills = 0
   ended = false
   private comboTicksRemaining = 0
-  private worldFreezeTicks = 0
-  private frenzyTicks = 0
+  private bulletTimeTicks = 0
+  private lastBiteFrenzyTicks = 0
+  private lastChanceUsed = false
   private nextPowerupId = 1
   private nextAttackTick = 0
   private dashChargeTicks = 0
@@ -168,8 +171,8 @@ export class GameState {
     this.updateDashCharge(input)
     this.updatePlayer(input)
 
-    const worldFrozen = this.worldFreezeTicks > 0
-    if (!worldFrozen) {
+    const worldStepsThisTick = this.bulletTimeTicks <= 0 || this.tick % LAST_CHANCE_WORLD_DIVISOR === 0
+    if (worldStepsThisTick) {
       this.updateEnemies()
       this.resolveEnemyEnemyCollisions()
       this.resolveEnemyPropCollisions()
@@ -183,11 +186,11 @@ export class GameState {
     }
 
     this.updatePowerups()
-    if (!worldFrozen) this.resolveEnemyContact()
+    if (worldStepsThisTick) this.resolveEnemyContact()
     this.ensurePopulation()
 
-    if (this.worldFreezeTicks > 0) this.worldFreezeTicks -= 1
-    if (this.frenzyTicks > 0) this.frenzyTicks -= 1
+    if (this.bulletTimeTicks > 0) this.bulletTimeTicks -= 1
+    if (this.lastBiteFrenzyTicks > 0) this.lastBiteFrenzyTicks -= 1
     if (this.player.invulnerableTicks > 0) this.player.invulnerableTicks -= 1
     if (this.player.hp <= 0 && !this.ended) {
       this.ended = true
@@ -215,21 +218,17 @@ export class GameState {
   }
 
   attackSpeedMultiplier(): number {
-    const comboBoost = this.comboKills >= 12 ? 1.35 : this.comboKills >= 8 ? 1.25 : this.comboKills >= 4 ? 1.12 : 1
-    return comboBoost * (this.frenzyTicks > 0 ? FRENZY_ATTACK_SPEED : 1)
+    const comboBoost = this.comboKills >= 12 ? 1.12 : this.comboKills >= 8 ? 1.08 : this.comboKills >= 4 ? 1.04 : 1
+    return comboBoost * (this.lastBiteFrenzyTicks > 0 ? LAST_BITE_ATTACK_SPEED : 1)
   }
 
   comboTimeRemaining(): number {
     return this.comboTicksRemaining
   }
 
-  freezeTicksRemaining(): number {
-    return this.worldFreezeTicks
-  }
-
-  frenzyTicksRemaining(): number {
-    return this.frenzyTicks
-  }
+  bulletTimeTicksRemaining(): number { return this.bulletTimeTicks }
+  frenzyTicksRemaining(): number { return this.lastBiteFrenzyTicks }
+  hasUsedLastChance(): boolean { return this.lastChanceUsed }
 
   resultHash(): string {
     let hash = 2166136261 >>> 0
@@ -244,8 +243,9 @@ export class GameState {
     feed(this.score)
     feed(this.comboKills)
     feed(this.comboTicksRemaining)
-    feed(this.worldFreezeTicks)
-    feed(this.frenzyTicks)
+    feed(this.bulletTimeTicks)
+    feed(this.lastBiteFrenzyTicks)
+    feed(this.lastChanceUsed ? 1 : 0)
     feed(this.nextPowerupId)
     feed(this.player.x)
     feed(this.player.y)
@@ -272,7 +272,7 @@ export class GameState {
 
     for (const powerup of this.powerups) {
       feed(powerup.id)
-      feed(powerup.kind === 'frenzy' ? 1 : powerup.kind === 'freeze' ? 2 : 3)
+      feed(1)
       feed(powerup.x)
       feed(powerup.y)
       feed(powerup.active ? 1 : 0)
@@ -333,12 +333,12 @@ export class GameState {
     const nx = input.x / Math.max(1, length)
     const ny = input.y / Math.max(1, length)
     const chargeSlowdown = input.dashHeld ? 0.55 : 1
-    const flowMoveBoost = this.comboMultiplier() >= 3 ? 1.08 : 1
+    const flowMoveBoost = this.comboMultiplier() >= 3 ? 1.03 : 1
     const speed = PLAYER_SPEED * chargeSlowdown * flowMoveBoost
     const nextX = clamp(this.player.x + nx * speed, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
-    if (!this.playerOverlapsProp(nextX, this.player.y)) this.player.x = nextX
+    if (!this.playerOverlapsProp(nextX, this.player.y) && !this.playerOverlapsLevel(nextX, this.player.y)) this.player.x = nextX
     const nextY = clamp(this.player.y + ny * speed, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
-    if (!this.playerOverlapsProp(this.player.x, nextY)) this.player.y = nextY
+    if (!this.playerOverlapsProp(this.player.x, nextY) && !this.playerOverlapsLevel(this.player.x, nextY)) this.player.y = nextY
   }
 
   private updateEnemies(): void {
@@ -359,6 +359,7 @@ export class GameState {
       enemy.y += enemy.vy
 
       this.resolveEnemyArenaWall(enemy)
+      this.resolveEnemyLevelObstacles(enemy)
       if (!enemy.active) continue
 
       enemy.impulseX *= IMPULSE_DRAG
@@ -561,9 +562,17 @@ export class GameState {
     let endX = clamp(startX + dash.stepX, -ARENA_BOUNDS.halfWidth, ARENA_BOUNDS.halfWidth)
     let endY = clamp(startY + dash.stepY, -ARENA_BOUNDS.halfHeight, ARENA_BOUNDS.halfHeight)
     let blocked = false
+    for (const obstacle of CITY_LEVEL_OBSTACLES) {
+      if (!segmentIntersectsExpandedObstacle(startX, startY, endX, endY, PLAYER_RADIUS, obstacle)) continue
+      blocked = true
+      endX = startX
+      endY = startY
+      break
+    }
     const dashForce = 12 + dash.power * 22
 
     for (const prop of this.props) {
+      if (blocked) break
       if (!prop.active || dash.hitPropIds.includes(prop.id)) continue
       const hitRadius = PLAYER_RADIUS + prop.radius
       if (distanceSqPointToSegment(prop.x, prop.y, startX, startY, endX, endY) > hitRadius * hitRadius) continue
@@ -679,7 +688,7 @@ export class GameState {
     }
   }
 
-  private registerKill(x: number, y: number): void {
+  private registerKill(_x: number, _y: number): void {
     const previousMultiplier = this.comboMultiplier()
     this.kills += 1
     this.comboKills += 1
@@ -697,50 +706,35 @@ export class GameState {
       })
     }
 
-    if (this.comboKills > 0 && this.comboKills % FLOW_FREEZE_EVERY_KILLS === 0) {
-      this.worldFreezeTicks = Math.max(this.worldFreezeTicks, FLOW_FREEZE_TICKS)
-      this.events.push({ type: 'flow-freeze', tick: this.tick, durationTicks: FLOW_FREEZE_TICKS, source: 'combo' })
-    }
-
-    if (this.kills % POWERUP_DROP_EVERY_KILLS === 0) this.dropPowerup(x, y)
   }
 
-  private dropPowerup(x: number, y: number): void {
-    const roll = this.rng.next()
-    const kind: PowerupKind = roll < 0.4 ? 'frenzy' : roll < 0.72 ? 'freeze' : 'apple-juice'
-    const powerup: PowerupState = {
-      id: this.nextPowerupId++,
-      kind,
-      x,
-      y,
-      active: true,
-      ttlTicks: POWERUP_TTL_TICKS,
-    }
+  private triggerLastChance(): void {
+    if (this.lastChanceUsed || this.player.hp !== 1) return
+    this.lastChanceUsed = true
+    this.bulletTimeTicks = LAST_CHANCE_BULLET_TIME_TICKS
+    this.player.invulnerableTicks = Math.max(this.player.invulnerableTicks, LAST_CHANCE_INVULNERABLE_TICKS)
+    const angle = normalizeAngle(this.player.facing + Math.PI * 0.5)
+    let x = clamp(this.player.x + Math.cos(angle) * 54, -ARENA_BOUNDS.halfWidth + 24, ARENA_BOUNDS.halfWidth - 24)
+    let y = clamp(this.player.y + Math.sin(angle) * 54, -ARENA_BOUNDS.halfHeight + 24, ARENA_BOUNDS.halfHeight - 24)
+    if (this.playerOverlapsLevel(x, y)) { x = this.player.x; y = this.player.y }
+    const powerup: PowerupState = { id: this.nextPowerupId++, kind: 'last-bite', x, y, active: true, ttlTicks: LAST_BITE_TTL_TICKS }
     this.powerups.push(powerup)
-    this.events.push({ type: 'powerup-drop', tick: this.tick, powerupId: powerup.id, kind, x, y })
+    this.events.push({ type: 'last-chance', tick: this.tick, powerupId: powerup.id, x, y })
+    this.events.push({ type: 'powerup-drop', tick: this.tick, powerupId: powerup.id, kind: 'last-bite', x, y })
+    this.events.push({ type: 'bullet-time', tick: this.tick, durationTicks: LAST_CHANCE_BULLET_TIME_TICKS })
   }
 
   private updatePowerups(): void {
     for (const powerup of this.powerups) {
       if (!powerup.active) continue
       powerup.ttlTicks -= 1
-      if (powerup.ttlTicks <= 0) {
-        powerup.active = false
-        continue
-      }
+      if (powerup.ttlTicks <= 0) { powerup.active = false; continue }
       const dx = powerup.x - this.player.x
       const dy = powerup.y - this.player.y
       if (dx * dx + dy * dy > POWERUP_PICKUP_RADIUS * POWERUP_PICKUP_RADIUS) continue
-
       powerup.active = false
-      if (powerup.kind === 'frenzy') {
-        this.frenzyTicks = Math.max(this.frenzyTicks, FRENZY_TICKS)
-      } else if (powerup.kind === 'freeze') {
-        this.worldFreezeTicks = Math.max(this.worldFreezeTicks, POWERUP_FREEZE_TICKS)
-        this.events.push({ type: 'flow-freeze', tick: this.tick, durationTicks: POWERUP_FREEZE_TICKS, source: 'powerup' })
-      } else {
-        this.player.hp = Math.min(PLAYER_MAX_HP, this.player.hp + 1)
-      }
+      this.player.hp = Math.min(PLAYER_MAX_HP, this.player.hp + LAST_BITE_HEAL)
+      this.lastBiteFrenzyTicks = LAST_BITE_FRENZY_TICKS
       this.events.push({ type: 'powerup-picked', tick: this.tick, powerupId: powerup.id, kind: powerup.kind })
     }
   }
@@ -773,6 +767,29 @@ export class GameState {
     return false
   }
 
+  private playerOverlapsLevel(x: number, y: number): boolean {
+    return CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(x, y, PLAYER_RADIUS, obstacle))
+  }
+
+  private resolveEnemyLevelObstacles(enemy: EnemyState): void {
+    for (const obstacle of CITY_LEVEL_OBSTACLES) {
+      if (!circleOverlapsObstacle(enemy.x, enemy.y, enemy.radius, obstacle)) continue
+      const left = obstacle.x - obstacle.width / 2 - enemy.radius
+      const right = obstacle.x + obstacle.width / 2 + enemy.radius
+      const top = obstacle.y - obstacle.height / 2 - enemy.radius
+      const bottom = obstacle.y + obstacle.height / 2 + enemy.radius
+      const distances = [
+        { axis: 'x' as const, value: left, d: Math.abs(enemy.x - left) },
+        { axis: 'x' as const, value: right, d: Math.abs(enemy.x - right) },
+        { axis: 'y' as const, value: top, d: Math.abs(enemy.y - top) },
+        { axis: 'y' as const, value: bottom, d: Math.abs(enemy.y - bottom) },
+      ].sort((a, b) => a.d - b.d)
+      const escape = distances[0]
+      if (escape.axis === 'x') { enemy.x = escape.value; enemy.impulseX *= -0.18 } else { enemy.y = escape.value; enemy.impulseY *= -0.18 }
+      enemy.staggerTicks = Math.max(enemy.staggerTicks, 2)
+    }
+  }
+
   private resolveEnemyContact(): void {
     if (this.player.invulnerableTicks > 0 || this.dashState) return
 
@@ -786,13 +803,16 @@ export class GameState {
       this.player.hp -= 1
       this.player.invulnerableTicks = 45
       this.events.push({ type: 'player-hit', tick: this.tick, hp: this.player.hp })
+      this.triggerLastChance()
       return
     }
   }
 
   private ensurePopulation(): void {
     while (this.enemies.activeCount() < TARGET_ENEMIES) {
-      if (!this.enemies.spawnAround(this.player.x, this.player.y, this.rng)) break
+      const enemy = this.enemies.spawnAround(this.player.x, this.player.y, this.rng)
+      if (!enemy) break
+      if (CITY_LEVEL_OBSTACLES.some((obstacle) => circleOverlapsObstacle(enemy.x, enemy.y, enemy.radius, obstacle))) { this.enemies.kill(enemy); continue }
     }
   }
 }
@@ -808,6 +828,15 @@ function distanceSqPointToSegment(px: number, py: number, ax: number, ay: number
   const dx = px - (ax + abx * t)
   const dy = py - (ay + aby * t)
   return dx * dx + dy * dy
+}
+
+function segmentIntersectsExpandedObstacle(ax: number, ay: number, bx: number, by: number, radius: number, obstacle: { id: number; x: number; y: number; width: number; height: number }): boolean {
+  const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 8))
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps
+    if (pointInsideExpandedObstacle(ax + (bx - ax) * t, ay + (by - ay) * t, radius, obstacle)) return true
+  }
+  return false
 }
 
 function clamp(value: number, min: number, max: number): number {
