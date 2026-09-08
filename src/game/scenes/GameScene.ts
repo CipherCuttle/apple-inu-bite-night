@@ -1,9 +1,11 @@
 import Phaser from 'phaser'
 import { BASE_SWORD, type AttackKind } from '../combat/Sword'
 import { DesktopCombatInput } from '../input/DesktopCombatInput'
+import { KeyboardCombatBuffer } from '../input/KeyboardCombatBuffer'
 import { ARENA_BOUNDS, GameState, type InputState, type PowerupKind, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import type { PropMaterial } from '../world/Props'
+import { CITY_LEVEL_OBSTACLES } from '../world/Level'
 import { GoreFx } from '../../presentation/GoreFx'
 import { getImpactProfile } from '../../presentation/CombatFeel'
 import { Sfx } from '../../presentation/Sfx'
@@ -34,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private comboText!: Phaser.GameObjects.Text
   private buffText!: Phaser.GameObjects.Text
   private flowBanner?: Phaser.GameObjects.Text
+  private readonly keyboardCombat = new KeyboardCombatBuffer()
   private powerupSprites = new Map<number, Phaser.GameObjects.Container>()
   private zombieSprites: Phaser.GameObjects.Image[] = []
   private propSprites: Phaser.GameObjects.Container[] = []
@@ -45,12 +48,10 @@ export class GameScene extends Phaser.Scene {
   private gore!: GoreFx
   private endedText?: Phaser.GameObjects.Text
   private hitStopMs = 0
-  private queuedSlash = false
-  private queuedStab = false
-  private queuedDashRelease = false
-  private queuedWhirlwind = false
 
   preload(): void {
+    this.load.image('city-tiles', 'assets/levels/city-block/tiles.png')
+    this.load.tilemapTiledJSON('city-level', 'assets/levels/city-block/map.json')
     this.load.image('apple-inu-sword', 'assets/characters/apple-inu/sword.png')
     this.load.image('zombie-walker', 'assets/enemies/zombies/walker.png')
     this.load.image('zombie-heavy', 'assets/enemies/zombies/heavy.png')
@@ -70,6 +71,7 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     this.createArena()
+    this.createImportedCityLevel()
     this.createPropRenderers()
     this.gore = new GoreFx(this)
     this.createPlayer()
@@ -92,18 +94,10 @@ export class GameScene extends Phaser.Scene {
     this.whirlwindKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
 
     keyboard.on('keydown', () => this.sfx.unlock())
-    keyboard.on('keydown-SPACE', () => {
-      this.queuedSlash = true
-    })
-    keyboard.on('keydown-E', () => {
-      this.queuedStab = true
-    })
-    keyboard.on('keydown-Q', () => {
-      this.queuedWhirlwind = true
-    })
-    keyboard.on('keyup-SHIFT', () => {
-      this.queuedDashRelease = true
-    })
+    keyboard.on('keydown-SPACE', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueSlash() })
+    keyboard.on('keydown-E', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueStab() })
+    keyboard.on('keydown-Q', (event: KeyboardEvent) => { if (!event.repeat) this.keyboardCombat.queueWhirlwind() })
+    keyboard.on('keyup-SHIFT', () => this.keyboardCombat.queueDashRelease())
     keyboard.on('keydown-R', () => this.restartRun())
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -131,26 +125,22 @@ export class GameScene extends Phaser.Scene {
   private readInputForTick(): InputState {
     const pointer = this.desktopInput.snapshot()
     const mouseAttacks = this.desktopInput.consumeAttacks()
+    const keyAttacks = this.keyboardCombat.consume()
     const dashHeld = pointer.rightHeld || this.dashKey.isDown
-    const dashReleaseEdge = this.queuedDashRelease || mouseAttacks.dashReleased
+    const dashReleaseEdge = keyAttacks.dashReleased || mouseAttacks.dashReleased
     const input: InputState = {
       x: Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
       y: Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
-      slash: this.queuedSlash || mouseAttacks.slash,
-      stab: this.queuedStab,
+      slash: keyAttacks.slash || mouseAttacks.slash,
+      stab: keyAttacks.stab,
       dashHeld,
       dashReleased: dashReleaseEdge && !dashHeld,
-      whirlwind: this.queuedWhirlwind,
+      whirlwind: keyAttacks.whirlwind,
     }
 
     if (pointer.active) {
       input.aimRadians = Math.atan2(pointer.y - (WORLD_CY + this.state.player.y), pointer.x - (WORLD_CX + this.state.player.x))
     }
-
-    this.queuedSlash = false
-    this.queuedStab = false
-    this.queuedDashRelease = false
-    this.queuedWhirlwind = false
     return input
   }
 
@@ -186,7 +176,7 @@ export class GameScene extends Phaser.Scene {
         else this.cameras.main.shake(35, Math.min(0.0028, 0.0008 + event.force * 0.00008))
       }
       if (event.type === 'combo-tier') this.showComboTier(event)
-      if (event.type === 'flow-freeze') this.showFlowFreeze(event)
+      if (event.type === 'bullet-time') this.showBulletTime(event)
       if (event.type === 'powerup-drop') this.spawnPowerupRenderer(event.powerupId, event.kind, event.x, event.y)
       if (event.type === 'powerup-picked') this.showPowerupPickup(event.kind)
       if (event.type === 'player-hit') {
@@ -208,7 +198,7 @@ export class GameScene extends Phaser.Scene {
     const comboWindow = this.state.comboTimeRemaining()
     this.comboText.setText(this.state.comboKills > 0 ? `CHAIN ${this.state.comboKills}  ×${multiplier}  CUT ${this.state.attackSpeedMultiplier().toFixed(2)}×  ${Math.ceil(comboWindow / 60)}s` : 'CHAIN —')
     const buffs: string[] = []
-    if (this.state.freezeTicksRemaining() > 0) buffs.push(`TIME FROZEN ${(this.state.freezeTicksRemaining() / 60).toFixed(1)}s`)
+    if (this.state.bulletTimeTicksRemaining() > 0) buffs.push(`LAST CHANCE ${(this.state.bulletTimeTicksRemaining() / 60).toFixed(1)}s`)
     if (this.state.frenzyTicksRemaining() > 0) buffs.push(`FRENZY ${(this.state.frenzyTicksRemaining() / 60).toFixed(1)}s`)
     this.buffText.setText(buffs.join('  •  '))
     this.syncPowerupRenderers()
@@ -305,6 +295,26 @@ export class GameScene extends Phaser.Scene {
     )
   }
 
+  private createImportedCityLevel(): void {
+    const map = this.make.tilemap({ key: 'city-level' })
+    const tiles = map.addTilesetImage('city-tileset', 'city-tiles', 8, 8, 0, 1)
+    if (tiles) {
+      const x = WORLD_CX - 440
+      const y = WORLD_CY - 240
+      map.createLayer('Terrain', tiles, x, y)?.setScale(2).setAlpha(0.34).setDepth(1)
+      map.createLayer('Objects', tiles, x, y)?.setScale(2).setAlpha(0.58).setDepth(2)
+    }
+    const graphics = this.add.graphics().setDepth(2.5)
+    for (const obstacle of CITY_LEVEL_OBSTACLES) {
+      graphics.fillStyle(0x0c0910, 0.82)
+      graphics.fillRect(WORLD_CX + obstacle.x - obstacle.width / 2, WORLD_CY + obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height)
+      graphics.lineStyle(2, 0x68415f, 0.78)
+      graphics.strokeRect(WORLD_CX + obstacle.x - obstacle.width / 2, WORLD_CY + obstacle.y - obstacle.height / 2, obstacle.width, obstacle.height)
+      graphics.lineStyle(1, 0x3a2638, 0.55)
+      for (let yy = -obstacle.height / 2 + 12; yy < obstacle.height / 2; yy += 18) graphics.lineBetween(WORLD_CX + obstacle.x - obstacle.width / 2 + 8, WORLD_CY + obstacle.y + yy, WORLD_CX + obstacle.x + obstacle.width / 2 - 8, WORLD_CY + obstacle.y + yy)
+    }
+  }
+
   private createPropRenderers(): void {
     const colors: Record<PropMaterial, number> = {
       wood: 0x8c4f31,
@@ -354,21 +364,21 @@ export class GameScene extends Phaser.Scene {
     const pawFrontTop = this.add.ellipse(5, -15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(-0.12)
     const pawFrontBottom = this.add.ellipse(5, 15, 16, 8, furHighlight).setStrokeStyle(2, dark).setRotation(0.12)
 
-    // Silhouette-first bitten apple head: strong top cleft + stepped side bite + tapered lower body.
-    const headOutline = this.add.ellipse(13, 1, 46, 43, dark)
-    const appleLower = this.add.ellipse(12, 6, 35, 31, fur)
-    const appleLobeRear = this.add.circle(4, -8, 14, furHighlight)
-    const appleLobeFront = this.add.circle(18, -8, 14, fur)
-    const appleCenter = this.add.ellipse(11, 0, 34, 35, fur)
-    const topCleft = this.add.triangle(11, -21, -5, 0, 5, 0, 0, 10, dark).setRotation(Math.PI)
-    const bottomTaperLeft = this.add.circle(-5, 18, 6, dark)
-    const bottomTaperRight = this.add.circle(28, 18, 6, dark)
-    // Oversized three-step bite notch must read at gameplay scale.
-    const biteUpper = this.add.circle(31, -8, 7, dark)
-    const biteMiddle = this.add.circle(35, 0, 7, dark)
-    const biteLower = this.add.circle(31, 8, 7, dark)
-    const stem = this.add.rectangle(11, -24, 4, 10, 0x79513a).setRotation(0.22)
-    const leaf = this.add.ellipse(2, -29, 19, 9, green).setStrokeStyle(2, dark).setRotation(-0.48)
+    // Apple-logo-first top silhouette: deliberately faceted for top-down readability.
+    const outline = this.add.polygon(10, 0, [
+      5, -25, -3, -20, -12, -22, -21, -16, -26, -6, -25, 7, -19, 18, -10, 27, 1, 31,
+      10, 27, 16, 20, 21, 21, 30, 14, 34, 5, 33, -5, 28, -15, 19, -22, 11, -23,
+    ], dark, 1)
+    const apple = this.add.polygon(10, 0, [
+      5, -20, -2, -16, -10, -18, -17, -13, -21, -5, -20, 6, -15, 15, -7, 22, 2, 26,
+      9, 22, 14, 16, 19, 17, 26, 11, 29, 4, 28, -4, 24, -12, 17, -18, 10, -19,
+    ], furHighlight, 1)
+    const topCleft = this.add.triangle(10, -20, -5, 0, 5, 0, 0, 9, dark).setRotation(Math.PI)
+    const bite1 = this.add.circle(29, -8, 7, dark)
+    const bite2 = this.add.circle(33, 0, 7.5, dark)
+    const bite3 = this.add.circle(29, 8, 6.5, dark)
+    const stem = this.add.rectangle(10, -28, 4, 10, 0x79513a).setRotation(0.24)
+    const leaf = this.add.ellipse(0, -31, 20, 8, green).setStrokeStyle(2, dark).setRotation(-0.48)
 
     // Side-bite clamp: sword hilt is physically layered between lower and upper jaw.
     const lowerJaw = this.add.ellipse(SWORD_MOUTH_X - 2, 4, 18, 8, furShade).setStrokeStyle(2, dark)
@@ -383,17 +393,12 @@ export class GameScene extends Phaser.Scene {
 
     this.headRig = this.add.container(0, 0, [
       ...this.swordTrails,
-      headOutline,
-      appleLower,
-      appleLobeRear,
-      appleLobeFront,
-      appleCenter,
+      outline,
+      apple,
       topCleft,
-      bottomTaperLeft,
-      bottomTaperRight,
-      biteUpper,
-      biteMiddle,
-      biteLower,
+      bite1,
+      bite2,
+      bite3,
       stem,
       leaf,
       lowerJaw,
@@ -552,8 +557,8 @@ export class GameScene extends Phaser.Scene {
     this.sfx.hit(event.material === 'metal' ? 'heavy' : 'light')
   }
 
-  private powerupColor(kind: PowerupKind): number {
-    return kind === 'frenzy' ? 0xff4f8d : kind === 'freeze' ? 0x75e6ff : 0x7cff7c
+  private powerupColor(_kind: PowerupKind): number {
+    return 0xffd35a
   }
 
   private spawnPowerupRenderer(id: number, kind: PowerupKind, x: number, y: number): void {
@@ -561,7 +566,7 @@ export class GameScene extends Phaser.Scene {
     const color = this.powerupColor(kind)
     const glow = this.add.circle(0, 0, 14, color, 0.16)
     const core = this.add.rectangle(0, 0, 13, 13, color, 0.95).setRotation(Math.PI / 4).setStrokeStyle(2, 0xffffff, 0.8)
-    const label = this.add.text(0, 18, kind === 'frenzy' ? 'CUT' : kind === 'freeze' ? 'TIME' : 'HP', {
+    const label = this.add.text(0, 18, 'LAST BITE', {
       fontFamily: 'monospace',
       fontSize: '9px',
       color: '#ffffff',
@@ -591,17 +596,17 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: text, scale: 1.05, alpha: 0, y: 92, duration: 720, ease: 'Back.Out', onComplete: () => text.destroy() })
   }
 
-  private showFlowFreeze(event: Extract<SimEvent, { type: 'flow-freeze' }>): void {
+  private showBulletTime(_event: Extract<SimEvent, { type: 'bullet-time' }>): void {
     this.flowBanner?.destroy()
-    this.flowBanner = this.add.text(480, 150, event.source === 'combo' ? 'FLOW FREEZE' : 'TIME CORE', {
+    this.flowBanner = this.add.text(480, 150, 'LAST CHANCE // BULLET TIME', {
       fontFamily: 'monospace', fontSize: '28px', color: '#d9fbff', backgroundColor: '#08131bdd', padding: { x: 14, y: 8 },
     }).setOrigin(0.5).setDepth(220)
     this.cameras.main.flash(70, 90, 220, 255, false)
     this.tweens.add({ targets: this.flowBanner, alpha: 0, scale: 1.22, duration: 560, ease: 'Quad.Out', onComplete: () => { this.flowBanner?.destroy(); this.flowBanner = undefined } })
   }
 
-  private showPowerupPickup(kind: PowerupKind): void {
-    const label = kind === 'frenzy' ? 'CUT FRENZY' : kind === 'freeze' ? 'TIME FREEZE' : 'APPLE JUICE +HP'
+  private showPowerupPickup(_kind: PowerupKind): void {
+    const label = 'LAST BITE // SAVED'
     const text = this.add.text(480, 190, label, { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }).setOrigin(0.5).setDepth(215)
     this.tweens.add({ targets: text, y: 172, alpha: 0, duration: 650, onComplete: () => text.destroy() })
   }
@@ -661,11 +666,8 @@ export class GameScene extends Phaser.Scene {
   private restartRun(): void {
     this.state = new GameState(0xa11e1)
     this.hitStopMs = 0
-    this.queuedSlash = false
-    this.queuedStab = false
-    this.queuedDashRelease = false
-    this.queuedWhirlwind = false
-    this.desktopInput.consumeAttacks()
+    this.keyboardCombat.clear()
+    this.desktopInput.clearAttackBuffers()
     this.gore.resetTransient()
     for (const sprite of this.powerupSprites.values()) sprite.destroy(true)
     this.powerupSprites.clear()
