@@ -27,6 +27,7 @@ try {
 
   await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 30000});
   await page.waitForFunction(() =>
+    window.__HLW_RUNTIME_READY === true &&
     window.Module && typeof window.Module._HLW_GetGold === 'function' &&
     document.getElementById('hlw-hud'), {timeout: 30000});
   await page.waitForFunction(() => window.Module._HLW_GetGold() === 80, {timeout: 10000});
