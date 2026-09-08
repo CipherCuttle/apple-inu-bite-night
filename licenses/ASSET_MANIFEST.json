@@ -1,41 +1,320 @@
 {
-  "version": 1,
-  "policy": "No third-party binary asset enters public/assets without a source URL, author, license, and modification note.",
-  "planned_sources": [
+  "version": 2,
+  "generated_at": "2026-09-08",
+  "policy": "No third-party binary enters public/assets unless its source page, license, provenance and exact bytes are recorded. Page-level CC0 claims are not treated as archive-level verification.",
+  "verification_states": {
+    "PAGE_VERIFIED": "Publisher/source page and license are verified, but archive bytes have not been hashed in our intake.",
+    "PINNED_MIRROR_VERIFIED": "Publisher source plus a pinned public mirror metadata record are verified. Individual imported bytes still require local hash capture before shipping.",
+    "ARCHIVE_HASH_VERIFIED": "Exact downloaded archive SHA-256 has been recorded and matched.",
+    "IMPORTED_CANONICAL": "Selected files were normalized into Bite Night art conventions and recorded in assets[]."
+  },
+  "sources": [
     {
-      "id": "freeart-topdown-zombies",
-      "purpose": "base zombie sprites and dismemberment source material",
-      "source": "https://opengameart.org/content/freeart-topdown-zombies",
+      "id": "spriteattack-freeart-topdown-zombies",
+      "priority": "P0",
+      "purpose": [
+        "zombie anatomy donor",
+        "exploded body parts",
+        "top-down animation reference"
+      ],
+      "author": "SpriteAttack",
+      "source_page": "https://opengameart.org/content/freeart-topdown-zombies",
       "license": "CC0-1.0",
-      "status": "approved-not-imported"
+      "page_claims": [
+        "3 top-down zombies",
+        "SVG source files",
+        "exploded body parts",
+        "animation samples for 2 zombies"
+      ],
+      "archive": {
+        "filename": "FreeArt_Topdown_Zombies.zip",
+        "source_url": "https://opengameart.org/sites/default/files/FreeArt_Topdown_Zombies_0.zip",
+        "declared_size": "603.4 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/FreeArt_Topdown_Zombies.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Use as anatomy/vector raw material; normalize palette, silhouette and body-part pivots before shipping.",
+      "destinations": [
+        "public/assets/enemies/zombies/base/",
+        "public/assets/enemies/zombies/parts/"
+      ]
+    },
+    {
+      "id": "spriteattack-topdown-soldier",
+      "priority": "P0",
+      "purpose": [
+        "human top-down anatomy donor",
+        "SVG/PDF body-part construction reference"
+      ],
+      "author": "SpriteAttack",
+      "source_page": "https://opengameart.org/content/topdown-soldier",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "vector SVG and PDF source files",
+        "top-down human body parts"
+      ],
+      "archive": {
+        "filename": "topdown1_tutorial_art.zip",
+        "source_url": "https://opengameart.org/sites/default/files/topdown1_tutorial_art.zip",
+        "declared_size": "418.5 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/topdown1_tutorial_art.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Use to improve human/zombie anatomy construction; final zombie art must remain visibly undead and canonicalized.",
+      "destinations": [
+        "art/source/anatomy/"
+      ]
     },
     {
       "id": "reactorcore-gore-blood-gibs-meat-chunks",
-      "purpose": "gore, blood, bone and gib source material",
-      "source": "https://opengameart.org/content/gore-blood-gibs-meat-chunks",
+      "priority": "P0",
+      "purpose": [
+        "meat chunks",
+        "bones",
+        "organs",
+        "gore particle raw material"
+      ],
+      "author": "Reactorcore",
+      "source_page": "https://opengameart.org/content/gore-blood-gibs-meat-chunks",
       "license": "CC0-1.0",
-      "status": "approved-not-imported"
+      "page_claims": [
+        "gore/blood/gib pixel sprites",
+        "meat",
+        "bones",
+        "organs",
+        "dismemberment use"
+      ],
+      "archive": {
+        "filename": "rc_art_-_gore_blood_gibs.zip",
+        "source_url": "https://opengameart.org/sites/default/files/rc_art_-_gore_blood_gibs.zip",
+        "declared_size": "75.7 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/rc_art_-_gore_blood_gibs.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Import only a bounded curated subset; preserve GoreBudget caps and never make individual blood droplets authoritative physics bodies.",
+      "destinations": [
+        "public/assets/gore/gibs/"
+      ]
     },
     {
-      "id": "kenney-topdown-shooter",
-      "purpose": "arena and prop source material",
-      "source": "https://kenney.nl/assets/top-down-shooter",
+      "id": "overcrafted-bloodsplatter-bloodsplash",
+      "priority": "P0",
+      "purpose": [
+        "animated blood splash",
+        "animated blood splatter"
+      ],
+      "author": "overcrafted",
+      "source_page": "https://opengameart.org/content/bloodsplatter-and-bloodsplash-animation",
       "license": "CC0-1.0",
-      "status": "approved-not-imported"
+      "page_claims": [
+        "bloodsplash frames and spritesheet",
+        "bloodsplatter animation",
+        "GIMP source included"
+      ],
+      "archive": {
+        "filename": "bloodsplat.zip",
+        "source_url": "https://opengameart.org/sites/default/files/bloodsplat.zip",
+        "declared_size": "516.7 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/bloodsplat.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Use one normalized splash sheet plus a small set of splat frames; color-grade to Bite Night blood palette.",
+      "destinations": [
+        "public/assets/gore/splashes/"
+      ]
+    },
+    {
+      "id": "kenney-top-down-shooter",
+      "priority": "P0",
+      "purpose": [
+        "breakable furniture",
+        "doors",
+        "arena props",
+        "urban tiles"
+      ],
+      "author": "Kenney",
+      "source_page": "https://kenney.nl/assets/top-down-shooter",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "580 listed 2D files",
+        "top-down",
+        "furniture",
+        "zombie tags"
+      ],
+      "pinned_mirror": {
+        "repository": "Tiddybub/2d-assets",
+        "commit": "e0cbe0d995554a490d4c182fe9beb8769ffbb606",
+        "path": "modern-urban/top-down-shooter",
+        "source_metadata_path": "modern-urban/top-down-shooter/SOURCE.md",
+        "mirror_file_count": 601
+      },
+      "verification": "PINNED_MIRROR_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_SELECTIVE_IMPORT",
+      "shipping_rule": "Use environment/prop material only; do not use Kenney zombie characters as final Bite Night zombie identity.",
+      "destinations": [
+        "public/assets/arena/props/",
+        "public/assets/arena/tiles/"
+      ]
     },
     {
       "id": "kenney-splat-pack",
-      "purpose": "blood/decal source material",
-      "source": "https://kenney.nl/assets/splat-pack",
+      "priority": "P1",
+      "purpose": [
+        "supplementary floor splats",
+        "non-anatomical decal shapes"
+      ],
+      "author": "Kenney",
+      "source_page": "https://kenney.nl/assets/splat-pack",
       "license": "CC0-1.0",
-      "status": "approved-not-imported"
+      "pinned_mirror": {
+        "repository": "Tiddybub/2d-assets",
+        "commit": "e0cbe0d995554a490d4c182fe9beb8769ffbb606",
+        "path": "effects/splat-pack",
+        "source_metadata_path": "effects/splat-pack/SOURCE.md",
+        "mirror_file_count": 111,
+        "mirror_safety_scan_removed_files": 2
+      },
+      "verification": "PINNED_MIRROR_VERIFIED",
+      "intake_status": "APPROVED_SOURCE_SELECTIVE_IMPORT",
+      "shipping_rule": "Use only as decal supplement after the authored blood animation/gib assets.",
+      "destinations": [
+        "public/assets/gore/decals/"
+      ]
+    },
+    {
+      "id": "shepardskin-dog-sprites",
+      "priority": "P1",
+      "purpose": [
+        "dog locomotion timing donor",
+        "secondary motion reference"
+      ],
+      "author": "Shepardskin",
+      "source_page": "https://opengameart.org/content/dog-sprites",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "original sprite sheet",
+        "6 animations",
+        "walk cycle",
+        "1x/2x/4x sizes"
+      ],
+      "archive": {
+        "filename": "dog.zip",
+        "source_url": "https://opengameart.org/sites/default/files/dog.zip",
+        "declared_size": "32.9 KiB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/dog.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_AWAITING_ARCHIVE_HASH",
+      "shipping_rule": "Motion/reference donor only. Final visible Apple Inu pixels must be custom and must preserve the canonical apple-dog silhouette, leaf/stem, muzzle and mouth-held sword.",
+      "destinations": [
+        "art/reference/apple-inu-motion/"
+      ]
+    },
+    {
+      "id": "rgs-modular-animated-vector-characters",
+      "priority": "P1",
+      "purpose": [
+        "modular-body rig architecture reference",
+        "detachable body-part workflow reference"
+      ],
+      "author": "RGS_Dev",
+      "source_page": "https://rgsdev.itch.io/free-cc0-modular-animated-vector-characters-2d",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "separated animated body parts",
+        "idle/walk/roll/jump/hit/death",
+        "69 MB free archive",
+        "no generative AI"
+      ],
+      "archive": {
+        "filename": "Free 2D Animated Vector Game Character Sprites.zip",
+        "source_url": null,
+        "declared_size": "69 MB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/Free 2D Animated Vector Game Character Sprites.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_ITch_SESSION_DOWNLOAD_NOT_BYTE_VERIFIED",
+      "shipping_rule": "Do not import production pixels until the itch archive is locally downloaded and hashed. Safe to study the modular-body concept now.",
+      "destinations": [
+        "art/reference/modular-body/"
+      ]
+    },
+    {
+      "id": "hormelz-free-8-directional-melee-character",
+      "priority": "P1",
+      "purpose": [
+        "8-direction melee timing reference",
+        "attack/strafe/hit/death pose study"
+      ],
+      "author": "Hormelz",
+      "source_page": "https://hormelz.itch.io/8-directional-melee-character",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "30+ animations",
+        "8-direction top-down/2.5D use",
+        "free CC0 pack",
+        "no AI tag on creator page"
+      ],
+      "archive": {
+        "filename": "MeleeCharacter.zip",
+        "source_url": null,
+        "declared_size": "13 MB",
+        "sha256": null,
+        "staging_path": "vendor/asset-inbox/MeleeCharacter.zip"
+      },
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "REFERENCE_APPROVED_ITch_SESSION_DOWNLOAD_NOT_BYTE_VERIFIED",
+      "shipping_rule": "Animation study first; do not make this humanoid character part of the final visual identity.",
+      "destinations": [
+        "art/reference/melee-motion/"
+      ]
+    },
+    {
+      "id": "rgs-cc0-melee-weapon-generator",
+      "priority": "P2",
+      "purpose": [
+        "sword silhouette ideation",
+        "CC0 generated melee weapon parts"
+      ],
+      "author": "RGS_Dev",
+      "source_page": "https://rgsdev.itch.io/free-cc0-melee-weapon-sprite-generator-online",
+      "license": "CC0-1.0",
+      "page_claims": [
+        "generated assets may be used freely",
+        "blade/guard/grip/pommel/decor customization"
+      ],
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "OPTIONAL_TOOL_APPROVED",
+      "shipping_rule": "Prefer a custom Apple Inu sword. If generator output is used, record the exported file as a derived asset with its own SHA-256.",
+      "destinations": [
+        "public/assets/weapons/"
+      ]
     },
     {
       "id": "game-icons",
-      "purpose": "upgrade icon source material",
-      "source": "https://game-icons.net/",
+      "priority": "DEFERRED",
+      "purpose": [
+        "future upgrade icons"
+      ],
+      "author": "multiple",
+      "source_page": "https://game-icons.net/",
       "license": "CC-BY-3.0",
-      "status": "approved-not-imported"
+      "verification": "PAGE_VERIFIED",
+      "intake_status": "DEFERRED_NOT_PART_OF_IDENTITY_PASS",
+      "shipping_rule": "Not part of the current identity pass; attribution ledger required if used later.",
+      "destinations": [
+        "public/assets/upgrades/"
+      ]
     }
   ],
   "assets": []

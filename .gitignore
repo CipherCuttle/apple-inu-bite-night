@@ -7,3 +7,7 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Third-party asset intake inbox. Raw archives are local audit material,
+# never source-controlled game assets.
+vendor/asset-inbox/
