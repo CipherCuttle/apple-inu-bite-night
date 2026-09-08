@@ -8,7 +8,7 @@ describe('special melee attacks', () => {
     expect(SWORD_ATTACKS.slash.arcRadians).toBeLessThan(Math.PI)
   })
 
-  it('charges on fixed ticks and releases into a deterministic forward dash', () => {
+  it('charges on fixed ticks and releases into a deterministic multi-tick forward dash', () => {
     const state = new GameState(42)
     state.player.hp = 999
 
@@ -22,8 +22,15 @@ describe('special melee attacks', () => {
     const dash = state.events.find((event) => event.type === 'sword-attack' && event.attack === 'dash')
     expect(dash).toBeDefined()
     expect(dash?.type === 'sword-attack' ? dash.distance : 0).toBeGreaterThan(180)
-    expect(state.player.x).toBeGreaterThan(150)
+    expect(state.isDashing()).toBe(true)
+    expect(state.player.x).toBeGreaterThan(0)
+    expect(state.player.x).toBeLessThan(80)
     expect(state.dashChargeRatio()).toBe(0)
+
+    let safety = 20
+    while (state.isDashing() && safety-- > 0) state.step({ x: 0, y: 0, aimRadians: 0 })
+    expect(state.isDashing()).toBe(false)
+    expect(state.player.x).toBeGreaterThan(180)
   })
 
   it('whirlwind hits behind the dog inside a full 360 degree radius', () => {
