@@ -75,7 +75,7 @@ jobs:
               expected=2,
           )
           replace_exact('PLAYER_SPEED', 'this.hero.movementProfile.speed', expected=1)
-          replace_exact('PLAYER_RADIUS', 'this.hero.movementProfile.collisionRadius', expected=5)
+          replace_exact('PLAYER_RADIUS', 'this.hero.movementProfile.collisionRadius', expected=6)
           replace_exact(
               "      type: 'sword-attack'\n      attack: AttackKind\n",
               "      type: 'weapon-attack'\n      weaponId: WeaponId\n      attack: AttackKind\n",
