@@ -41,19 +41,29 @@ HANDLE MemAlloc(long size);
 void MemFree(HANDLE mem);
 
 static int M_WasmFSReadFile(LPCSTR fileName, void **buf) {
-    return FS_ReadFileQ3(fileName, buf);
+    fprintf(stderr, "WASM_MENU_FS=entered name=%s bufslot=%p\\n", fileName ? fileName : "(null)", (void *)buf);
+    int size = FS_ReadFileQ3(fileName, buf);
+    fprintf(stderr, "WASM_MENU_FS=returned size=%d buf=%p\\n", size, buf ? *buf : NULL);
+    return size;
 }
 
 static void M_WasmFSFreeFile(void *buf) {
+    fprintf(stderr, "WASM_MENU_FS=free-entered buf=%p\\n", buf);
     FS_FreeFile(buf);
+    fprintf(stderr, "WASM_MENU_FS=free-returned\\n");
 }
 
 static HANDLE M_WasmMemAlloc(long size) {
-    return MemAlloc(size);
+    fprintf(stderr, "WASM_MENU_MEM=alloc-entered size=%ld\\n", size);
+    HANDLE mem = MemAlloc(size);
+    fprintf(stderr, "WASM_MENU_MEM=alloc-returned mem=%p\\n", mem);
+    return mem;
 }
 
 static void M_WasmMemFree(HANDLE mem) {
+    fprintf(stderr, "WASM_MENU_MEM=free-entered mem=%p\\n", mem);
     MemFree(mem);
+    fprintf(stderr, "WASM_MENU_MEM=free-returned\\n");
 }
 
 static void M_WasmPrintf(LPCSTR fmt, ...) {
