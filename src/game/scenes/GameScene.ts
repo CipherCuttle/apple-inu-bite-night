@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { BASE_SWORD, type AttackKind } from '../combat/Sword'
 import { DesktopCombatInput } from '../input/DesktopCombatInput'
-import { ARENA_BOUNDS, GameState, type InputState } from '../sim/GameState'
+import { ARENA_BOUNDS, GameState, type InputState, type SimEvent } from '../sim/GameState'
 import { FixedTick } from '../sim/FixedTick'
 import { GoreFx } from '../../presentation/GoreFx'
 import { getImpactProfile } from '../../presentation/CombatFeel'
@@ -12,6 +12,7 @@ const WORLD_CY = 270
 const WORLD_WIDTH = 960
 const WORLD_HEIGHT = 540
 const ENEMY_CAPACITY = 220
+const SLASH_TRAIL_ANGLES = [-0.72, -0.36, 0, 0.36, 0.72]
 
 export class GameScene extends Phaser.Scene {
   private readonly fixed = new FixedTick()
@@ -29,12 +30,17 @@ export class GameScene extends Phaser.Scene {
   private killText!: Phaser.GameObjects.Text
   private zombieSprites: Phaser.GameObjects.Image[] = []
   private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>
+  private dashKey!: Phaser.Input.Keyboard.Key
+  private stabKey!: Phaser.Input.Keyboard.Key
+  private whirlwindKey!: Phaser.Input.Keyboard.Key
   private desktopInput!: DesktopCombatInput
   private gore!: GoreFx
   private endedText?: Phaser.GameObjects.Text
   private hitStopMs = 0
   private queuedSlash = false
   private queuedStab = false
+  private queuedDashRelease = false
+  private queuedWhirlwind = false
 
   create(): void {
     this.createPlaceholderTextures()
@@ -55,6 +61,9 @@ export class GameScene extends Phaser.Scene {
       left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     }
+    this.dashKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+    this.stabKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E)
+    this.whirlwindKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q)
 
     keyboard.on('keydown', () => this.sfx.unlock())
     keyboard.on('keydown-SPACE', () => {
@@ -62,6 +71,12 @@ export class GameScene extends Phaser.Scene {
     })
     keyboard.on('keydown-E', () => {
       this.queuedStab = true
+    })
+    keyboard.on('keydown-Q', () => {
+      this.queuedWhirlwind = true
+    })
+    keyboard.on('keyup-SHIFT', () => {
+      this.queuedDashRelease = true
     })
     keyboard.on('keydown-R', () => this.restartRun())
 
@@ -90,11 +105,16 @@ export class GameScene extends Phaser.Scene {
   private readInputForTick(): InputState {
     const pointer = this.desktopInput.snapshot()
     const mouseAttacks = this.desktopInput.consumeAttacks()
+    const dashHeld = pointer.rightHeld || this.dashKey.isDown
+    const dashReleaseEdge = this.queuedDashRelease || mouseAttacks.dashReleased
     const input: InputState = {
       x: Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
       y: Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
       slash: this.queuedSlash || mouseAttacks.slash,
-      stab: this.queuedStab || mouseAttacks.stab,
+      stab: this.queuedStab,
+      dashHeld,
+      dashReleased: dashReleaseEdge && !dashHeld,
+      whirlwind: this.queuedWhirlwind,
     }
 
     if (pointer.active) {
@@ -103,6 +123,8 @@ export class GameScene extends Phaser.Scene {
 
     this.queuedSlash = false
     this.queuedStab = false
+    this.queuedDashRelease = false
+    this.queuedWhirlwind = false
     return input
   }
 
@@ -128,7 +150,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const event of events) {
       if (event.type === 'sword-attack') {
-        this.animateSword(event.attack)
+        this.animateSword(event)
         this.sfx.sword(event.attack)
       }
       if (event.type === 'player-hit') {
@@ -167,23 +189,33 @@ export class GameScene extends Phaser.Scene {
   private syncPointerPresentation(): void {
     if (!this.desktopInput || !this.crosshair || !this.aimGuide || !this.inputText) return
     const pointer = this.desktopInput.snapshot()
+    const charge = this.state.dashChargeRatio()
     this.aimGuide.clear()
-
-    if (!pointer.active) {
-      this.crosshair.setVisible(false)
-      this.inputText.setText('INPUT: MOVE MOUSE TO ARM CURSOR')
-      return
-    }
 
     const playerX = WORLD_CX + this.state.player.x
     const playerY = WORLD_CY + this.state.player.y
+    if (charge > 0) {
+      this.aimGuide.lineStyle(4, 0xff4f8d, 0.82)
+      this.aimGuide.beginPath()
+      this.aimGuide.arc(playerX, playerY, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * charge)
+      this.aimGuide.strokePath()
+    }
+
+    if (!pointer.active) {
+      this.crosshair.setVisible(false)
+      this.inputText.setText(`INPUT: MOVE MOUSE TO ARM CURSOR${charge > 0 ? `  •  CHARGE ${Math.round(charge * 100)}%` : ''}`)
+      return
+    }
+
     const aimRadians = Math.atan2(pointer.y - playerY, pointer.x - playerX)
     const aimDegrees = Math.round((aimRadians * 180) / Math.PI)
 
-    this.aimGuide.lineStyle(1, 0xff4f8d, 0.34)
+    this.aimGuide.lineStyle(charge > 0 ? 2 : 1, 0xff4f8d, charge > 0 ? 0.72 : 0.34)
     this.aimGuide.lineBetween(playerX, playerY, pointer.x, pointer.y)
     this.crosshair.setVisible(true).setPosition(pointer.x, pointer.y)
-    this.inputText.setText(`INPUT: MOUSE ✓  AIM ${aimDegrees}°  LMB ${pointer.leftClicks}  RMB ${pointer.rightClicks}`)
+    this.inputText.setText(
+      `INPUT: MOUSE ✓  AIM ${aimDegrees}°  LMB ${pointer.leftClicks}  RMB ${pointer.rightPresses}/${pointer.rightReleases}${charge > 0 ? `  CHARGE ${Math.round(charge * 100)}%` : ''}`,
+    )
   }
 
   private createArena(): void {
@@ -218,7 +250,7 @@ export class GameScene extends Phaser.Scene {
         .setRotation(angle)
         .setAlpha(0)
 
-    this.swordTrails = [makeTrail(-0.22), makeTrail(0.22)]
+    this.swordTrails = SLASH_TRAIL_ANGLES.map(makeTrail)
 
     const body = this.add.ellipse(-5, 0, 44, 27, 0xc9333d).setStrokeStyle(3, 0x230811)
     const hind = this.add.ellipse(-24, 0, 18, 18, 0x9f2432).setStrokeStyle(2, 0x230811)
@@ -236,40 +268,85 @@ export class GameScene extends Phaser.Scene {
     this.player = this.add.container(WORLD_CX, WORLD_CY, [hind, body, this.headRig]).setDepth(10)
   }
 
-  private animateSword(attack: AttackKind): void {
+  private animateSword(event: Extract<SimEvent, { type: 'sword-attack' }>): void {
+    const attack: AttackKind = event.attack
     this.tweens.killTweensOf(this.headRig)
     this.tweens.killTweensOf(this.sword)
     for (const trail of this.swordTrails) this.tweens.killTweensOf(trail)
 
     this.headRig.setPosition(0, 0).setRotation(0)
     this.sword.setPosition(BASE_SWORD.innerRadius, 0).setScale(1, 1).setAlpha(1)
+    for (let i = 0; i < this.swordTrails.length; i += 1) {
+      this.swordTrails[i].setRotation(SLASH_TRAIL_ANGLES[i]).setAlpha(0).setScale(1, 1)
+    }
 
     if (attack === 'slash') {
-      this.headRig.setRotation(-0.58)
-      this.sword.setScale(1.04, 1.38)
+      this.headRig.setPosition(-3, -2).setRotation(-1.32)
+      this.sword.setScale(1.08, 1.42)
       for (let i = 0; i < this.swordTrails.length; i += 1) {
-        this.swordTrails[i].setAlpha(i === 0 ? 0.36 : 0.24).setScale(1.03, 1.3)
+        const distanceFromCenter = Math.abs(i - (this.swordTrails.length - 1) / 2)
+        this.swordTrails[i].setAlpha(0.42 - distanceFromCenter * 0.07).setScale(1.06, 1.34)
       }
       this.tweens.add({
         targets: this.headRig,
-        rotation: 0.48,
-        duration: 92,
+        x: 4,
+        y: 2,
+        rotation: 1.18,
+        duration: 155,
         ease: 'Cubic.Out',
         onComplete: () => {
-          this.tweens.add({ targets: this.headRig, rotation: 0, duration: 65, ease: 'Quad.Out' })
+          this.tweens.add({ targets: this.headRig, x: 0, y: 0, rotation: 0, duration: 75, ease: 'Quad.Out' })
         },
       })
-    } else {
+    } else if (attack === 'stab') {
       this.headRig.setX(-4)
       this.sword.setX(BASE_SWORD.innerRadius - 5).setScale(1.12, 0.9)
-      this.swordTrails[0].setRotation(0).setAlpha(0.42).setScale(1.3, 0.75)
+      this.swordTrails[2].setRotation(0).setAlpha(0.42).setScale(1.3, 0.75)
       this.tweens.add({ targets: this.headRig, x: 12, duration: 58, yoyo: true, ease: 'Quad.Out' })
       this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 24, scaleX: 1.28, duration: 58, yoyo: true, ease: 'Quad.Out' })
+    } else if (attack === 'dash') {
+      const power = event.power ?? 0
+      const distance = event.distance ?? 0
+      this.headRig.setX(-9)
+      this.sword.setX(BASE_SWORD.innerRadius - 7).setScale(1.22 + power * 0.22, 0.82)
+      this.swordTrails[2].setRotation(0).setAlpha(0.58).setScale(1.65 + power * 0.55, 0.65)
+      this.tweens.add({ targets: this.headRig, x: 22, duration: 72, yoyo: true, ease: 'Expo.Out' })
+      this.tweens.add({ targets: this.sword, x: BASE_SWORD.innerRadius + 38, duration: 72, yoyo: true, ease: 'Expo.Out' })
+
+      if (distance > 1) {
+        const streak = this.add
+          .rectangle(
+            WORLD_CX + event.x + Math.cos(event.facing) * (distance / 2),
+            WORLD_CY + event.y + Math.sin(event.facing) * (distance / 2),
+            distance,
+            13 + power * 9,
+            0xff4f8d,
+            0.28 + power * 0.18,
+          )
+          .setRotation(event.facing)
+          .setDepth(4)
+        this.tweens.add({ targets: streak, alpha: 0, scaleY: 0.25, duration: 150, ease: 'Quad.Out', onComplete: () => streak.destroy() })
+      }
+    } else if (attack === 'whirlwind') {
+      this.sword.setScale(1.12, 1.28)
+      for (let i = 0; i < this.swordTrails.length; i += 1) {
+        this.swordTrails[i]
+          .setRotation((i / this.swordTrails.length) * Math.PI * 2)
+          .setAlpha(0.28)
+          .setScale(1.12, 1.24)
+      }
+      this.tweens.add({
+        targets: this.headRig,
+        rotation: Math.PI * 2.15,
+        duration: 305,
+        ease: 'Cubic.Out',
+        onComplete: () => this.headRig.setRotation(0),
+      })
     }
 
-    this.tweens.add({ targets: this.sword, scaleY: 1, duration: 105, ease: 'Quad.Out' })
+    this.tweens.add({ targets: this.sword, scaleY: 1, duration: attack === 'whirlwind' ? 260 : 120, ease: 'Quad.Out' })
     for (const trail of this.swordTrails) {
-      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: 125, ease: 'Quad.Out' })
+      this.tweens.add({ targets: trail, alpha: 0, scaleX: 1, scaleY: 1, duration: attack === 'whirlwind' ? 300 : 180, ease: 'Quad.Out' })
     }
   }
 
@@ -297,8 +374,14 @@ export class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(16, 14, '', style).setDepth(100)
     this.timerText = this.add.text(480, 14, '', style).setOrigin(0.5, 0).setDepth(100)
     this.killText = this.add.text(944, 14, '', style).setOrigin(1, 0).setDepth(100)
-    this.inputText = this.add.text(16, 486, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
-    this.add.text(16, 510, 'WASD MOVE  •  MOUSE AIM  •  LMB SLASH  •  RMB STAB  •  R RESTART', { ...style, fontSize: '12px', color: '#a998b6' }).setDepth(100)
+    this.inputText = this.add.text(16, 478, 'INPUT: MOVE MOUSE TO ARM CURSOR', { ...style, fontSize: '12px', color: '#ff77a5' }).setDepth(160)
+    this.add
+      .text(16, 505, 'WASD MOVE • LMB WIDE SLASH • HOLD RMB / SHIFT CHARGE → RELEASE DASH • Q WHIRLWIND • E STAB • R RESTART', {
+        ...style,
+        fontSize: '11px',
+        color: '#a998b6',
+      })
+      .setDepth(100)
   }
 
   private createPlaceholderTextures(): void {
@@ -341,6 +424,8 @@ export class GameScene extends Phaser.Scene {
     this.hitStopMs = 0
     this.queuedSlash = false
     this.queuedStab = false
+    this.queuedDashRelease = false
+    this.queuedWhirlwind = false
     this.desktopInput.consumeAttacks()
     this.gore.resetTransient()
     this.endedText?.destroy()
