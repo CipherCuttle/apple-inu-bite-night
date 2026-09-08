@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "policy": "No third-party binary asset enters public/assets without a source URL, author, license, and modification note.",
+  "planned_sources": [
+    {
+      "id": "freeart-topdown-zombies",
+      "purpose": "base zombie sprites and dismemberment source material",
+      "source": "https://opengameart.org/content/freeart-topdown-zombies",
+      "license": "CC0-1.0",
+      "status": "approved-not-imported"
+    },
+    {
+      "id": "reactorcore-gore-blood-gibs-meat-chunks",
+      "purpose": "gore, blood, bone and gib source material",
+      "source": "https://opengameart.org/content/gore-blood-gibs-meat-chunks",
+      "license": "CC0-1.0",
+      "status": "approved-not-imported"
+    },
+    {
+      "id": "kenney-topdown-shooter",
+      "purpose": "arena and prop source material",
+      "source": "https://kenney.nl/assets/top-down-shooter",
+      "license": "CC0-1.0",
+      "status": "approved-not-imported"
+    },
+    {
+      "id": "kenney-splat-pack",
+      "purpose": "blood/decal source material",
+      "source": "https://kenney.nl/assets/splat-pack",
+      "license": "CC0-1.0",
+      "status": "approved-not-imported"
+    },
+    {
+      "id": "game-icons",
+      "purpose": "upgrade icon source material",
+      "source": "https://game-icons.net/",
+      "license": "CC-BY-3.0",
+      "status": "approved-not-imported"
+    }
+  ],
+  "assets": []
+}
