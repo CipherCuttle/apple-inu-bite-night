@@ -46,6 +46,10 @@ bool tw_session_init(tw_session_t *session,
         memset(session, 0, sizeof(*session));
         return false;
     }
+    for (uint8_t actor = 0; actor < TW_PLAYER_COUNT; ++actor) {
+        session->hero_level[actor] = HLW_HERO_START_LEVEL;
+        session->hero_basic_damage[actor] = HLW_HERO_BASIC_DAMAGE;
+    }
     return true;
 }
 
@@ -106,6 +110,9 @@ uint64_t tw_session_state_hash(const tw_session_t *session) {
     for (uint8_t actor = 0; actor < TW_PLAYER_COUNT; ++actor) {
         hash = hash_u64(hash, session->hero_ready_tick[actor]);
         hash = hash_u64(hash, session->hero_ability_ready_tick[actor]);
+        hash = hash_u32(hash, session->hero_xp[actor]);
+        hash = hash_byte(hash, session->hero_level[actor]);
+        hash = hash_u32(hash, session->hero_basic_damage[actor]);
     }
     return hash;
 }
