@@ -1,4 +1,5 @@
 #include "tw_hero_ability.h"
+#include "tw_hero_combat.h"
 
 #include <assert.h>
 #include <stdio.h>
