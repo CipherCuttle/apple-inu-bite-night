@@ -45,6 +45,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_selection_ring.py
           python3 ../spike/tower_wars/patch_hlw_native_creep.py
           python3 ../spike/tower_wars/patch_hlw_native_hero.py
+          python3 ../spike/tower_wars/patch_hlw_hero_reset_reuse.py
           git diff --check
 
       - name: Inject deterministic session and preserve menu isolation
@@ -81,6 +82,8 @@ jobs:
             timeout 120s node spike/tower_wars/h1_native_entity_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h2_hero_command_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h2_reset_reuse_smoke.mjs
 
       - name: Upload H2 Wasm artifact
         uses: actions/upload-artifact@v4
