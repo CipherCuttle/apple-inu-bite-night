@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  h1-h5-native-authority:
+  h1-h6-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -84,7 +84,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 H2 H3 H4 regressions and H5 progression
+      - name: Prove H1 through H5 regressions and H6 bot parity
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -113,11 +113,13 @@ jobs:
             timeout 120s node spike/tower_wars/h4_hero_ability_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h5_hero_progression_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h6_bot_parity_smoke.mjs
 
-      - name: Upload H5 Wasm artifact
+      - name: Upload H6 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h5-v0
+          name: hero-line-wars-native-h6-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
