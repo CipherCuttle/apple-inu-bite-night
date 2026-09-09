@@ -112,16 +112,17 @@ static void invalid_sends_are_fail_closed_and_non_mutating(void) {
 static void queue_and_economy_overflow_fail_atomically(void) {
     tw_match_t match;
     assert(tw_match_init(&match, 6, 4, (tw_cell_t){0, 1}, (tw_cell_t){5, 1}, 1000));
+    tw_action_t action = send_action(0, TW_CREEP_SCOUT);
 
     match.pending_send_count = TW_MAX_PENDING_SENDS;
     uint64_t before = tw_match_hash(&match);
-    assert(tw_match_apply_action(&match, &send_action(0, TW_CREEP_SCOUT)) == TW_APPLY_SEND_CAPACITY);
+    assert(tw_match_apply_action(&match, &action) == TW_APPLY_SEND_CAPACITY);
     assert(tw_match_hash(&match) == before);
 
     match.pending_send_count = 0;
     match.players[0].income = UINT32_MAX - 1;
     before = tw_match_hash(&match);
-    assert(tw_match_apply_action(&match, &send_action(0, TW_CREEP_SCOUT)) == TW_APPLY_ECONOMY_OVERFLOW);
+    assert(tw_match_apply_action(&match, &action) == TW_APPLY_ECONOMY_OVERFLOW);
     assert(tw_match_hash(&match) == before);
 
     match.players[0].income = TW_STARTING_INCOME;
