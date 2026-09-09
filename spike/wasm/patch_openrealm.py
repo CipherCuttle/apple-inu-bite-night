@@ -159,6 +159,29 @@ replace(
     "void PF_Sleep(DWORD msec) {\n#ifdef __EMSCRIPTEN__\n    (void)msec;\n#else\n    usleep(msec * 1000);\n#endif\n}\n",
 )
 
+# Trace the narrow browser-only CL_Init boundary. These markers deliberately
+# stay out of native builds and make the first failing subsystem explicit in CI.
+replace(
+    "client/cl_main.c",
+    "    re.Init(mode.width, mode.height);\n    \n    S_Init();\n    CL_MusicInit();\n    CL_MovieInit();\n",
+    "    re.Init(mode.width, mode.height);\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=renderer_done\\n\");\n#endif\n    \n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=sound_begin\\n\");\n#endif\n    S_Init();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=sound_done\\n\");\n#endif\n    CL_MusicInit();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=music_done\\n\");\n#endif\n    CL_MovieInit();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=movie_done\\n\");\n#endif\n",
+)
+replace(
+    "client/cl_main.c",
+    "    menu.Init();\n\n    SZ_Init(&cls.netchan.message, cls.netchan.message_buf, MAX_MSGLEN);\n",
+    "#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=menu_begin\\n\");\n#endif\n    menu.Init();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=menu_done\\n\");\n#endif\n\n    SZ_Init(&cls.netchan.message, cls.netchan.message_buf, MAX_MSGLEN);\n",
+)
+replace(
+    "client/cl_main.c",
+    "    CL_ClearState();\n\n    Cmd_AddCommand(\"quit\", CL_Quit_f);\n",
+    "    CL_ClearState();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=clear_state_done\\n\");\n#endif\n\n    Cmd_AddCommand(\"quit\", CL_Quit_f);\n",
+)
+replace(
+    "client/cl_main.c",
+    "    CON_Init();\n    CL_InitInput();\n\n    CL_SetMenuBindings();\n",
+    "    CON_Init();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=console_done\\n\");\n#endif\n    CL_InitInput();\n#ifdef __EMSCRIPTEN__\n    fprintf(stderr, \"OPENREALM_BROWSER_INIT=input_done\\n\");\n#endif\n\n    CL_SetMenuBindings();\n",
+)
+
 # A browser smoke only counts after the actual OpenRealm client init returns
 # with the SDL GL context that the renderer created. BZ_GL_ES3 requests ES 3,
 # which Emscripten maps to WebGL2 under the link settings in the spike harness.
