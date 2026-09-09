@@ -21,19 +21,28 @@ typedef struct {
 typedef enum {
     TW_EVENT_ACTION = 1,
     TW_EVENT_STEP = 2,
+    TW_EVENT_HERO_ATTACK = 3,
 } tw_event_kind_t;
+
+typedef struct {
+    uint8_t actor;
+    uint32_t creep_id;
+} tw_hero_attack_event_t;
 
 typedef struct {
     tw_event_kind_t kind;
     union {
         tw_action_t action;
         uint32_t ticks;
+        tw_hero_attack_event_t hero_attack;
     } data;
 } tw_event_t;
 
 typedef struct {
     tw_session_origin_t origin;
     tw_match_t match;
+    /* Earliest authoritative match tick at which each seat may basic-attack. */
+    uint64_t hero_ready_tick[TW_PLAYER_COUNT];
     uint16_t event_count;
     tw_event_t events[TW_MAX_LOG_EVENTS];
 } tw_session_t;
