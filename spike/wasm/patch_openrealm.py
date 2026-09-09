@@ -116,8 +116,8 @@ new_loop = r'''#ifdef __EMSCRIPTEN__
     Uint64 performanceFrequency = SDL_GetPerformanceFrequency();
     while (true) {
         Uint64 frameStart = SDL_GetPerformanceCounter();
-        DWORD current_time = SDL_GetTicks();
-        DWORD msec = current_time - startTime;
+        DWORD currentTime = SDL_GetTicks();
+        DWORD msec = currentTime - startTime;
         if (SV_IsActive()) {
             SV_Frame(Cvar_Integer("com_fast_forward", 0) ? FRAMETIME : msec);
         }
@@ -132,7 +132,7 @@ new_loop = r'''#ifdef __EMSCRIPTEN__
                 Cbuf_Execute();
             }
         }
-        startTime = current_time;
+        startTime = currentTime;
         frameCount++;
         if (Cvar_Integer("com_frame_limit", 0) > 0 &&
             frameCount >= (DWORD)Cvar_Integer("com_frame_limit", 0)) {
