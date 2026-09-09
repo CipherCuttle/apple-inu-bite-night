@@ -1,0 +1,53 @@
+name: tower-wars-core-v0
+
+on:
+  push:
+    branches:
+      - phase-tw-1/tower-wars-core-loop-v0
+  pull_request:
+    branches:
+      - pivot/openrealm-wasm-spike-v0
+    paths:
+      - 'towerwars/core/**'
+      - 'docs/TOWER_WARS_CORE_LOOP_V0.md'
+      - '.github/workflows/tower-wars-core-v0.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tower-wars-core-v0-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Diff hygiene
+        shell: bash
+        run: git diff --check HEAD^ HEAD
+
+      - name: Build with ASan and UBSan
+        shell: bash
+        run: |
+          mkdir -p build/towerwars
+          gcc \
+            -std=c11 \
+            -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined \
+            -fno-omit-frame-pointer \
+            towerwars/core/tw_core.c \
+            towerwars/core/tw_core_test.c \
+            -o build/towerwars/tw_core_test
+
+      - name: Run deterministic core tests
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: build/towerwars/tw_core_test
