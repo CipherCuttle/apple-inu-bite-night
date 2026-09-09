@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -49,9 +49,27 @@ Closure evidence:
 - High repair: partial mirrors clear fail-closed; reset/step surface native-sync failure; build/send/step freeze while presentation is degraded until reset.
 - Targeted re-review after the High repair: `C0 / H0`.
 
-### H2 — HERO_ENTITY_COMMAND_V0
+### H2 — HERO_ENTITY_COMMAND_V0 — PASS
 
 Both seats own one authoritative OpenRealm hero entity. Human and bot movement commands enter through the same validated hero-command boundary and produce deterministic world movement.
+
+Closure evidence:
+
+- Candidate head after High repair: `71ea6071d8bbf56428e1dec5dd88a447025dec2a`.
+- GitHub Actions run: `34400730133` — PASS.
+- Artifact: `hero-line-wars-native-h2-v0`, ID `10123410468`, SHA-256 `920e3685a9908967826ccc487e0db5837dbd1babd8c39fe7c27a33bf8f8fce8b`.
+- H1 regression remained PASS in the same Wasm artifact.
+- Native hero edicts were `26` and `27`; the same entity numbers crossed server snapshot → client entity → actual renderer draw.
+- Human and bot both used the same exported `_HLW_BrowserHeroMove(actor, x, y)` boundary; no bot-only movement export existed and the raw native `HLW_OpenRealmHeroCommandMove` mutation was not exported to JS.
+- Invalid actor, cross-lane and out-of-bounds movement commands failed closed without changing hero positions.
+- After exactly five deterministic ticks, actor 0 moved `(-120,-140) → (-80,-140)` and actor 1 moved `(120,140) → (80,140)`.
+- Reset plus the same ordered commands reproduced the same positions.
+- Hostile review: 1 High — rapid reset freed hero edicts, but upstream `G_Spawn()` quarantines recently freed edicts for 1000 ms, so reset spam could consume `globals.num_edicts` and eventually exhaust the entity pool.
+- High repair: healthy hero edicts are now unlinked, canonically reinitialized and relinked in place instead of freed/reallocated.
+- Targeted proof performed 64 immediate resets; every reset retained exact entity IDs `26/27`, restored canonical starts, then both heroes still accepted the shared command and moved correctly.
+- OpenRealm WebGL2 remained alive after the reset burst.
+- Targeted re-review after the High repair: `C0 / H0`.
+- Carry-forward Medium: when H3 introduces hero combat/HP fields, the in-place reset initializer must explicitly restore those newly authoritative fields too; this does not invalidate H2 because H2 authority is limited to entity identity, command validation, position and goal state.
 
 ### H3 — HERO_BASIC_COMBAT_V0
 
