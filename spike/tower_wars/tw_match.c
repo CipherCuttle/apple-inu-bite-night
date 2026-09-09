@@ -104,6 +104,8 @@ bool tw_match_init(tw_match_t *match,
     }
     match->next_tower_id = 1;
     match->next_creep_id = 1;
+    match->winner = TW_NO_PLAYER;
+    match->loser = TW_NO_PLAYER;
     return true;
 }
 
@@ -187,6 +189,7 @@ static tw_apply_result_t apply_send(tw_match_t *match, const tw_action_t *action
 tw_apply_result_t tw_match_apply_action(tw_match_t *match, const tw_action_t *action) {
     if (!match) return TW_APPLY_INVALID_MATCH;
     if (!action) return TW_APPLY_INVALID_ACTION;
+    if (match->terminal) return TW_APPLY_MATCH_TERMINAL;
     if (!valid_actor(action->actor)) return TW_APPLY_INVALID_ACTOR;
 
     switch (action->kind) {
@@ -249,13 +252,21 @@ static bool leak_creep(tw_match_t *match, uint16_t index) {
     if (index >= match->active_creep_count) return false;
     const tw_creep_t *creep = &match->active_creeps[index];
     if (!valid_actor(creep->target) || !valid_creep(creep->kind)) return false;
+    const uint8_t loser = creep->target;
     const tw_creep_def_t *def = tw_creep_def(creep->kind);
     if (!def) return false;
 
-    tw_player_state_t *target = &match->players[creep->target];
+    tw_player_state_t *target = &match->players[loser];
     if (def->leak_damage >= target->lives) target->lives = 0;
     else target->lives = (uint16_t)(target->lives - def->leak_damage);
+    const bool terminal_now = target->lives == 0;
     remove_active_creep(match, index);
+
+    if (terminal_now) {
+        match->terminal = true;
+        match->loser = loser;
+        match->winner = (uint8_t)(loser ^ 1u);
+    }
     return true;
 }
 
@@ -375,6 +386,7 @@ static bool move_creeps_one_tick(tw_match_t *match) {
             if (path.length == 1) {
                 if (!leak_creep(match, i)) return false;
                 removed = true;
+                if (match->terminal) return true;
                 break;
             }
 
@@ -383,6 +395,7 @@ static bool move_creeps_one_tick(tw_match_t *match) {
             if (creep->cell.x == grid->exit.x && creep->cell.y == grid->exit.y) {
                 if (!leak_creep(match, i)) return false;
                 removed = true;
+                if (match->terminal) return true;
                 break;
             }
         }
@@ -393,12 +406,14 @@ static bool move_creeps_one_tick(tw_match_t *match) {
 
 static bool step_in_place(tw_match_t *match, uint32_t ticks) {
     for (uint32_t n = 0; n < ticks; ++n) {
+        if (match->terminal) break;
         if (!spawn_pending_sends(match)) return false;
         if (match->tick == UINT64_MAX) return false;
         match->tick++;
         if (!pay_income_if_due(match)) return false;
         if (!run_tower_combat_one_tick(match)) return false;
         if (!move_creeps_one_tick(match)) return false;
+        if (match->terminal) break;
     }
     return true;
 }
@@ -416,7 +431,7 @@ bool tw_match_advance_income(tw_match_t *match, uint32_t ticks) {
 }
 
 bool tw_bot_choose_build(const tw_match_t *match, uint8_t actor, tw_action_t *action_out) {
-    if (!match || !action_out || !valid_actor(actor)) return false;
+    if (!match || !action_out || !valid_actor(actor) || match->terminal) return false;
 
     const tw_player_state_t *player = &match->players[actor];
     const tw_tower_def_t *def = tw_tower_def(TW_TOWER_NEEDLE);
@@ -471,6 +486,9 @@ uint64_t tw_match_hash(const tw_match_t *match) {
     hash = hash_u64(hash, match->tick);
     hash = hash_u32(hash, match->pending_send_count);
     hash = hash_u32(hash, match->active_creep_count);
+    hash = hash_byte(hash, match->terminal ? 1 : 0);
+    hash = hash_byte(hash, match->winner);
+    hash = hash_byte(hash, match->loser);
 
     for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
         const tw_player_state_t *player = &match->players[p];
