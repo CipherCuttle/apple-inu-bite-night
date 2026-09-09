@@ -68,3 +68,14 @@ jobs:
 
       - name: Verify deterministic tower combat contract
         run: /tmp/tower-wars-combat-test
+
+      - name: Compile G6 match termination tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/test_tw_terminal.c \
+            -o /tmp/tower-wars-terminal-test
+
+      - name: Verify terminal winner loser freeze contract
+        run: /tmp/tower-wars-terminal-test
