@@ -79,3 +79,15 @@ jobs:
 
       - name: Verify terminal winner loser freeze contract
         run: /tmp/tower-wars-terminal-test
+
+      - name: Compile G7 replay/hash tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/tw_replay.c \
+            spike/tower_wars/test_tw_replay.c \
+            -o /tmp/tower-wars-replay-test
+
+      - name: Verify deterministic replay and state hash contract
+        run: /tmp/tower-wars-replay-test
