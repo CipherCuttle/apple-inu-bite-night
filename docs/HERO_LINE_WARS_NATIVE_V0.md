@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -150,9 +150,38 @@ Closure evidence:
 - Carry-forward Medium: full native positional legality is not reconstructed by session replay yet because native hero movement is not in the ordered session log; H7 explicitly owns that consistency gate.
 - Carry-forward Medium: H3/H4 currently duplicate a small active-creep retirement helper; H5 should consolidate kill reward/XP/retirement into one deterministic resolution path rather than adding a third copy.
 
-### H5 — HERO_XP_LEVEL_V0
+### H5 — HERO_XP_LEVEL_V0 — PASS
 
 Creep kills grant deterministic XP. Crossing the frozen threshold changes hero level/stats exactly once and is represented in the authoritative state hash/replay.
+
+Frozen H5 progression:
+
+- Start level: `1`.
+- Kill XP reward: `50`.
+- Level-2 threshold: `100` XP.
+- V0 max level: `2`.
+- Level-1 basic damage: `25`.
+- Level-2 basic damage: `30`.
+- Basic attacks and PHASE LANCE share one deterministic lethal-resolution path for creep retirement, gold reward, XP and level transition.
+
+Closure evidence:
+
+- Candidate head: `7fbdd247e1b61e37a30ff08e560686f685ad833d`.
+- GitHub Actions run: `34411660223` — PASS.
+- Artifact: `hero-line-wars-native-h5-v0`, ID `10127523494`, SHA-256 `35f3811d7068c00dc1123e52455be13b3221b3670be11a640a8bc51b50561b2e`.
+- Deterministic H3, H4 and H5 host authority tests all passed under `-Wall -Wextra -Werror` before the OpenRealm build.
+- H1 native-creep, H2 movement/reset, H3 basic-combat and H4 PHASE LANCE regressions all remained PASS in the same Wasm artifact.
+- First Scout kill through the basic-attack path granted exactly `50` XP and `20` gold; actor 0 remained level `1` with `25` basic damage.
+- Second Scout kill through PHASE LANCE raised XP `50 → 100`, transitioned level `1 → 2` exactly at the frozen threshold, and changed basic damage `25 → 30`.
+- A subsequent level-2 basic hit changed Scout HP `45 → 15`, independently proving the `30` damage stat is used by combat rather than being HUD-only state.
+- Progression fields are included in the authoritative session state hash; browser replay reproduced XP `100`, level `2`, damage `30` and the same state/log hashes.
+- Reset restored XP `0`, level `1`, damage `25` while preserving the stable native hero entity IDs.
+- The shared lethal resolver rejects nonlethal use and preflights gold/XP overflow before mutation; overflow/rejected paths are non-mutating in the host proof.
+- The raw lethal resolver is not exported to the browser; product ingress remains the actor-indexed attack/ability commands.
+- OpenRealm WebGL2 remained alive through the full H1→H5 proof.
+- Hostile review of the complete H4-closure→H5 delta: `C0 / H0`; no repair or targeted re-review cycle required.
+- Carry-forward Medium: the shared lethal resolver is a cross-file internal helper rather than an opaque private symbol. Product/browser ingress cannot call it, but H6/H7 must not widen or bypass this mutation surface.
+- Carry-forward Medium: H5 intentionally does not resolve H3/H4's coarse creep-position range legality or missing native-movement replay; H7 owns full replay/native consistency.
 
 ### H6 — BOT_PARITY_V0
 
