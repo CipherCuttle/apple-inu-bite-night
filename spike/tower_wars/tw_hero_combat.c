@@ -23,6 +23,55 @@ static void remove_active_creep(tw_match_t *match, uint16_t index) {
     memset(&match->active_creeps[match->active_creep_count], 0, sizeof(match->active_creeps[0]));
 }
 
+hlw_hero_kill_resolve_result_t tw_session_resolve_hero_kill(
+    tw_session_t *session,
+    uint8_t actor,
+    uint32_t creep_id,
+    hlw_hero_kill_outcome_t *outcome_out) {
+    if (outcome_out) memset(outcome_out, 0, sizeof(*outcome_out));
+    if (!session) return HLW_HERO_KILL_RESOLVE_INVALID_SESSION;
+    if (actor >= TW_PLAYER_COUNT) return HLW_HERO_KILL_RESOLVE_INVALID_ACTOR;
+
+    const int found = find_creep_index(&session->match, creep_id);
+    if (found < 0) return HLW_HERO_KILL_RESOLVE_INVALID_TARGET;
+    const tw_creep_t *current = &session->match.active_creeps[found];
+    if (current->target != actor || current->hit_points == 0) {
+        return HLW_HERO_KILL_RESOLVE_INVALID_TARGET;
+    }
+    if (session->match.players[actor].gold > UINT32_MAX - HLW_HERO_KILL_GOLD_REWARD) {
+        return HLW_HERO_KILL_RESOLVE_GOLD_OVERFLOW;
+    }
+    if (session->hero_xp[actor] > UINT32_MAX - HLW_HERO_KILL_XP_REWARD) {
+        return HLW_HERO_KILL_RESOLVE_XP_OVERFLOW;
+    }
+
+    const uint32_t old_xp = session->hero_xp[actor];
+    const uint32_t new_xp = old_xp + HLW_HERO_KILL_XP_REWARD;
+    bool leveled = false;
+
+    session->match.players[actor].gold += HLW_HERO_KILL_GOLD_REWARD;
+    session->hero_xp[actor] = new_xp;
+    if (session->hero_level[actor] == HLW_HERO_START_LEVEL &&
+        old_xp < HLW_HERO_LEVEL_2_XP && new_xp >= HLW_HERO_LEVEL_2_XP) {
+        session->hero_level[actor] = HLW_HERO_MAX_LEVEL;
+        session->hero_basic_damage[actor] = HLW_HERO_LEVEL_2_BASIC_DAMAGE;
+        leveled = true;
+    }
+
+    remove_active_creep(&session->match, (uint16_t)found);
+
+    if (outcome_out) {
+        *outcome_out = (hlw_hero_kill_outcome_t){
+            .reward_gold = HLW_HERO_KILL_GOLD_REWARD,
+            .reward_xp = HLW_HERO_KILL_XP_REWARD,
+            .leveled = leveled,
+            .hero_level = session->hero_level[actor],
+            .hero_basic_damage = session->hero_basic_damage[actor],
+        };
+    }
+    return HLW_HERO_KILL_RESOLVE_OK;
+}
+
 hlw_hero_attack_result_t tw_session_hero_attack(
     tw_session_t *session,
     uint8_t actor,
@@ -45,23 +94,38 @@ hlw_hero_attack_result_t tw_session_hero_attack(
         return HLW_HERO_ATTACK_INVALID_TARGET;
     }
 
-    const bool killing = HLW_HERO_BASIC_DAMAGE >= current->hit_points;
-    if (killing &&
-        session->match.players[actor].gold > UINT32_MAX - HLW_HERO_KILL_GOLD_REWARD) {
-        return HLW_HERO_ATTACK_ECONOMY_OVERFLOW;
-    }
+    const uint32_t damage = session->hero_basic_damage[actor];
+    if (damage == 0) return HLW_HERO_ATTACK_INVALID_SESSION;
+    const bool killing = damage >= current->hit_points;
 
     tw_session_t candidate = *session;
     tw_creep_t *creep = &candidate.match.active_creeps[found];
-    hlw_hero_attack_outcome_t outcome = {0};
+    hlw_hero_attack_outcome_t outcome = {
+        .hero_level = candidate.hero_level[actor],
+        .hero_basic_damage = candidate.hero_basic_damage[actor],
+    };
 
     if (killing) {
-        candidate.match.players[actor].gold += HLW_HERO_KILL_GOLD_REWARD;
+        hlw_hero_kill_outcome_t kill_outcome;
+        const hlw_hero_kill_resolve_result_t kill_result = tw_session_resolve_hero_kill(
+            &candidate, actor, creep_id, &kill_outcome);
+        if (kill_result == HLW_HERO_KILL_RESOLVE_GOLD_OVERFLOW) {
+            return HLW_HERO_ATTACK_ECONOMY_OVERFLOW;
+        }
+        if (kill_result == HLW_HERO_KILL_RESOLVE_XP_OVERFLOW) {
+            return HLW_HERO_ATTACK_PROGRESSION_OVERFLOW;
+        }
+        if (kill_result != HLW_HERO_KILL_RESOLVE_OK) {
+            return HLW_HERO_ATTACK_INVALID_TARGET;
+        }
         outcome.killed = true;
-        outcome.reward_gold = HLW_HERO_KILL_GOLD_REWARD;
-        remove_active_creep(&candidate.match, (uint16_t)found);
+        outcome.reward_gold = kill_outcome.reward_gold;
+        outcome.reward_xp = kill_outcome.reward_xp;
+        outcome.leveled = kill_outcome.leveled;
+        outcome.hero_level = kill_outcome.hero_level;
+        outcome.hero_basic_damage = kill_outcome.hero_basic_damage;
     } else {
-        creep->hit_points -= HLW_HERO_BASIC_DAMAGE;
+        creep->hit_points -= damage;
         outcome.remaining_hit_points = creep->hit_points;
     }
 
