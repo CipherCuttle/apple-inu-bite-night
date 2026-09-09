@@ -84,6 +84,34 @@ static void test_income_cadence(void) {
     CHECK(tw_validate_state(&s));
 }
 
+static void test_winner_and_terminal_freeze(void) {
+    tw_state_t s;
+    tw_init(&s);
+    s.players[1].lives = 1;
+    CHECK(tw_validate_state(&s));
+    CHECK(tw_send_creep(&s, 0u, TW_CREEP_RUNNER) == TW_OK);
+    for (unsigned i = 0; i < 20u && tw_winner(&s) == TW_NO_WINNER; ++i) tw_tick(&s);
+    CHECK(tw_winner(&s) == 0);
+    uint64_t terminal_hash = tw_state_hash(&s);
+    tw_tick(&s);
+    CHECK(tw_state_hash(&s) == terminal_hash);
+    CHECK(tw_send_creep(&s, 0u, TW_CREEP_SWARM) == TW_ERR_GAME_OVER);
+    CHECK(tw_place_tower(&s, 0u, TW_TOWER_BASIC, 2u, 2u) == TW_ERR_GAME_OVER);
+    CHECK(tw_validate_state(&s));
+}
+
+static void test_simultaneous_leak_draw(void) {
+    tw_state_t s;
+    tw_init(&s);
+    s.players[0].lives = 1;
+    s.players[1].lives = 1;
+    CHECK(tw_send_creep(&s, 0u, TW_CREEP_RUNNER) == TW_OK);
+    CHECK(tw_send_creep(&s, 1u, TW_CREEP_RUNNER) == TW_OK);
+    for (unsigned i = 0; i < 20u && tw_winner(&s) == TW_NO_WINNER; ++i) tw_tick(&s);
+    CHECK(tw_winner(&s) == TW_DRAW);
+    CHECK(tw_validate_state(&s));
+}
+
 static void replay(tw_state_t *s, bool perturb) {
     static const tw_action_t actions[] = {
         {TW_ACTION_PLACE_TOWER, 0u, 3u, 2u, TW_TOWER_BASIC},
@@ -152,6 +180,8 @@ int main(void) {
     test_creep_leaks();
     test_tower_kills_for_bounty();
     test_income_cadence();
+    test_winner_and_terminal_freeze();
+    test_simultaneous_leak_draw();
     test_replay_hash();
     test_live_creep_reroutes_after_build();
     test_active_creep_cannot_be_stranded();
