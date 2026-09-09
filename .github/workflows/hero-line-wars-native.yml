@@ -13,13 +13,13 @@ permissions:
   contents: read
 
 jobs:
-  h1-h4-native-authority:
+  h1-h5-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile deterministic H3 H4 authority tests
+      - name: Compile deterministic H3 H4 H5 authority tests
         run: |
           common=(
             spike/tower_wars/tw_grid.c
@@ -36,6 +36,10 @@ jobs:
             "${common[@]}" spike/tower_wars/test_hlw_hero_ability.c \
             -o /tmp/hlw-hero-ability-test
           /tmp/hlw-hero-ability-test
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            "${common[@]}" spike/tower_wars/test_hlw_hero_progression.c \
+            -o /tmp/hlw-hero-progression-test
+          /tmp/hlw-hero-progression-test
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v10
@@ -80,7 +84,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 H2 H3 regressions and H4 Phase Lance
+      - name: Prove H1 H2 H3 H4 regressions and H5 progression
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -107,11 +111,13 @@ jobs:
             timeout 120s node spike/tower_wars/h3_basic_combat_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h4_hero_ability_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h5_hero_progression_smoke.mjs
 
-      - name: Upload H4 Wasm artifact
+      - name: Upload H5 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h4-v0
+          name: hero-line-wars-native-h5-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
