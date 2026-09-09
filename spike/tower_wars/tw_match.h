@@ -51,6 +51,7 @@ typedef struct {
     uint8_t owner;
     tw_tower_kind_t kind;
     tw_cell_t cell;
+    uint16_t cooldown_ticks;
 } tw_tower_t;
 
 typedef struct {
