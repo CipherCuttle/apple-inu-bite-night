@@ -13,6 +13,7 @@
 #define TW_STARTING_INCOME 10
 #define TW_INCOME_PERIOD_TICKS 20
 #define TW_STARTING_LIVES 20
+#define TW_NO_PLAYER UINT8_MAX
 
 typedef enum {
     TW_TOWER_NEEDLE = 0,
@@ -89,6 +90,9 @@ typedef struct {
     tw_pending_send_t pending_sends[TW_MAX_PENDING_SENDS];
     uint16_t active_creep_count;
     tw_creep_t active_creeps[TW_MAX_CREEPS];
+    bool terminal;
+    uint8_t winner;
+    uint8_t loser;
 } tw_match_t;
 
 typedef enum {
@@ -115,6 +119,7 @@ typedef enum {
     TW_APPLY_INVALID_MATCH,
     TW_APPLY_INVALID_ACTOR,
     TW_APPLY_INVALID_ACTION,
+    TW_APPLY_MATCH_TERMINAL,
     TW_APPLY_INVALID_TOWER,
     TW_APPLY_INVALID_CREEP,
     TW_APPLY_INSUFFICIENT_GOLD,
