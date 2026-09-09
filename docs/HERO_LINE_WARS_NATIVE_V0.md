@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -69,11 +69,46 @@ Closure evidence:
 - Targeted proof performed 64 immediate resets; every reset retained exact entity IDs `26/27`, restored canonical starts, then both heroes still accepted the shared command and moved correctly.
 - OpenRealm WebGL2 remained alive after the reset burst.
 - Targeted re-review after the High repair: `C0 / H0`.
-- Carry-forward Medium: when H3 introduces hero combat/HP fields, the in-place reset initializer must explicitly restore those newly authoritative fields too; this does not invalidate H2 because H2 authority is limited to entity identity, command validation, position and goal state.
+- Carry-forward Medium: when a later gate introduces native hero HP/combat fields, the in-place reset initializer must explicitly restore those newly authoritative fields too; H3 added session-owned attack cadence but no native hero HP state.
 
-### H3 — HERO_BASIC_COMBAT_V0
+### H3 — HERO_BASIC_COMBAT_V0 — PASS
 
 Hero basic attacks acquire legal incoming targets and apply deterministic damage/cadence. A hero kill retires the same underlying creep exactly once and grants exactly one combat reward.
+
+Frozen H3 mechanics:
+
+- Basic attack damage: `25`.
+- Basic attack cadence: `4` authoritative match ticks.
+- Native server target range: `96` OpenRealm world units.
+- Hero kill reward: `20` gold.
+- Target ordering: incoming creeps only; nearest squared native-server distance first; creep ID ascending as the deterministic tie-break.
+
+Authority path:
+
+`native OpenRealm hero position + session-derived native creep mirror → legal target ID → tw_session_hero_attack → authoritative creep HP/kill/reward/event → H1 native mirror sync/removal`
+
+The browser may request only `HLW_BrowserHeroAttack(actor)`. It cannot supply target ID, range, damage, HP, reward or retirement state. Native target acquisition chooses a legal incoming target; `tw_session_hero_attack` remains authoritative for cadence, damage, kill retirement, reward and replay logging.
+
+Closure evidence:
+
+- Candidate head: `e7f1ecff0078a97d31c981b4fa3fffe79b36ef13`.
+- GitHub Actions run: `34402182442` — PASS.
+- Artifact: `hero-line-wars-native-h3-v0`, ID `10123944857`, SHA-256 `9b7c74d1e8757166d467b0fea3b5ed4970d1ae1700e0213fe256cb91c615dbf6`.
+- Deterministic host combat test passed before the OpenRealm build.
+- H1 native-creep bridge and both H2 movement/reset regressions remained PASS in the same Wasm artifact.
+- Scout creep `1` entered player 0's lane as the same native OpenRealm edict `28` used by target acquisition and later retirement.
+- Wrong-seat actor 1 could not acquire the outgoing creep; the rejected attack left authoritative state/log hashes unchanged.
+- Actor 0 acquired creep `1` / edict `28` inside the frozen native range and the first attack changed authoritative HP `45 → 20`, granted no reward and set readiness to tick `5`.
+- An immediate repeat was rejected by deterministic cadence without changing state, log, HP or gold.
+- At tick `5`, the second attack killed the same creep, removed native edict `28`, granted exactly `20` combat gold (`500 → 520`) and advanced readiness to tick `9`.
+- A post-kill retry could not reacquire the retired creep and granted no second reward.
+- Advancing another 80 ticks left player 0 at `20` lives with no active creep, proving the killed creep did not later leak.
+- Browser replay verification passed with the H3 attack events included in state/log hashes.
+- OpenRealm WebGL2 remained alive through the proof.
+- Hostile review: `C0 / H0`; no repair or re-review cycle required.
+- Carry-forward Medium: native H3 range currently uses the authoritative server creep mirror's cell coordinates and does not apply `progress_milli`, so renderer interpolation can be visually finer-grained than attack-range legality.
+- Carry-forward Medium: H3 replay reproduces accepted attack effects/cadence, but native range legality is not replayed because native hero movement is not yet in the session log; H7 explicitly owns full replay/native consistency.
+- Carry-forward Medium: nearest/creep-ID target ordering is deterministic in implementation, but H3 browser evidence exercises a single legal target rather than a multi-target tie case.
 
 ### H4 — HERO_ABILITY_V0
 
