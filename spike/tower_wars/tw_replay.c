@@ -1,5 +1,6 @@
 #include "tw_replay.h"
 #include "tw_hero_combat.h"
+#include "tw_hero_ability.h"
 
 #include <string.h>
 
@@ -104,6 +105,7 @@ uint64_t tw_session_state_hash(const tw_session_t *session) {
     hash = hash_u64(hash, tw_match_hash(&session->match));
     for (uint8_t actor = 0; actor < TW_PLAYER_COUNT; ++actor) {
         hash = hash_u64(hash, session->hero_ready_tick[actor]);
+        hash = hash_u64(hash, session->hero_ability_ready_tick[actor]);
     }
     return hash;
 }
@@ -137,6 +139,10 @@ uint64_t tw_session_log_hash(const tw_session_t *session) {
             case TW_EVENT_HERO_ATTACK:
                 hash = hash_byte(hash, event->data.hero_attack.actor);
                 hash = hash_u32(hash, event->data.hero_attack.creep_id);
+                break;
+            case TW_EVENT_HERO_ABILITY:
+                hash = hash_byte(hash, event->data.hero_ability.actor);
+                hash = hash_u32(hash, event->data.hero_ability.creep_id);
                 break;
             default:
                 /* Unknown event kinds still produce a deterministic digest;
@@ -188,6 +194,18 @@ tw_session_result_t tw_session_replay(const tw_session_t *recorded,
                     event->data.hero_attack.creep_id,
                     &outcome);
                 if (attack_result != HLW_HERO_ATTACK_OK) {
+                    return TW_SESSION_REPLAY_DIVERGED;
+                }
+                break;
+            }
+            case TW_EVENT_HERO_ABILITY: {
+                hlw_hero_ability_outcome_t outcome;
+                const hlw_hero_ability_result_t ability_result = tw_session_hero_ability(
+                    &replayed,
+                    event->data.hero_ability.actor,
+                    event->data.hero_ability.creep_id,
+                    &outcome);
+                if (ability_result != HLW_HERO_ABILITY_OK) {
                     return TW_SESSION_REPLAY_DIVERGED;
                 }
                 break;
