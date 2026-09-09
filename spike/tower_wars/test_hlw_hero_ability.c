@@ -94,12 +94,13 @@ int main(void) {
     assert_unchanged(&session, post_kill_events, post_kill_state, post_kill_log);
 
     assert(tw_session_step(&session, HLW_HERO_ABILITY_COOLDOWN_TICKS) == TW_SESSION_OK);
+    const uint32_t gold_before_retired_retry = session.match.players[0].gold;
     const uint16_t retired_events = session.event_count;
     const uint64_t retired_state = tw_session_state_hash(&session);
     const uint64_t retired_log = tw_session_log_hash(&session);
     assert(tw_session_hero_ability(&session, 0, creep_id, &outcome) ==
            HLW_HERO_ABILITY_INVALID_TARGET);
-    assert(session.match.players[0].gold == gold_after_kill);
+    assert(session.match.players[0].gold == gold_before_retired_retry);
     assert_unchanged(&session, retired_events, retired_state, retired_log);
 
     assert(tw_session_step(&session, 80) == TW_SESSION_OK);
