@@ -389,6 +389,8 @@ const char *TW_BrowserSnapshot(void) {
                    "\"lastHeroAbilityResult\":%u,"
                    "\"replayOk\":%s,\"nativeSyncOk\":%s,\"heroOk\":%s,"
                    "\"heroReady\":[%llu,%llu],\"heroAbilityReady\":[%llu,%llu],"
+                   "\"heroXP\":[%u,%u],\"heroLevel\":[%u,%u],"
+                   "\"heroBasicDamage\":[%u,%u],"
                    "\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
                    (unsigned long long)match->tick,
                    (unsigned)browser_session.event_count,
@@ -408,6 +410,12 @@ const char *TW_BrowserSnapshot(void) {
                    (unsigned long long)browser_session.hero_ready_tick[1],
                    (unsigned long long)browser_session.hero_ability_ready_tick[0],
                    (unsigned long long)browser_session.hero_ability_ready_tick[1],
+                   (unsigned)browser_session.hero_xp[0],
+                   (unsigned)browser_session.hero_xp[1],
+                   (unsigned)browser_session.hero_level[0],
+                   (unsigned)browser_session.hero_level[1],
+                   (unsigned)browser_session.hero_basic_damage[0],
+                   (unsigned)browser_session.hero_basic_damage[1],
                    (unsigned long long)tw_session_state_hash(&browser_session),
                    (unsigned long long)tw_session_log_hash(&browser_session));
 
