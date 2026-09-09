@@ -46,3 +46,14 @@ jobs:
 
       - name: Verify authoritative send and periodic income contract
         run: /tmp/tower-wars-send-test
+
+      - name: Compile G4 creep route/leak tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/test_tw_creeps.c \
+            -o /tmp/tower-wars-creep-test
+
+      - name: Verify deterministic creep routing and leak contract
+        run: /tmp/tower-wars-creep-test
