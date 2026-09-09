@@ -1,4 +1,5 @@
 #include "tw_replay.h"
+#include "tw_hero_combat.h"
 
 #include <emscripten/emscripten.h>
 #include <stdarg.h>
@@ -37,12 +38,14 @@ extern int HLW_OpenRealmHeroStep(uint32_t ticks);
 extern uint32_t HLW_OpenRealmHeroEntityNumber(uint8_t actor);
 extern int HLW_OpenRealmHeroX(uint8_t actor);
 extern int HLW_OpenRealmHeroY(uint8_t actor);
+extern uint32_t HLW_OpenRealmHeroAcquireTarget(uint8_t actor, float range);
 #endif
 
 static tw_session_t browser_session;
 static bool browser_initialized;
 static tw_session_result_t browser_last_session_result = TW_SESSION_MATCH_REJECTED;
 static tw_apply_result_t browser_last_match_result = TW_APPLY_INVALID_MATCH;
+static hlw_hero_attack_result_t browser_last_hero_attack_result = HLW_HERO_ATTACK_INVALID_SESSION;
 static bool browser_replay_ok;
 static bool browser_native_sync_ok = true;
 static bool browser_hero_ok = true;
@@ -114,6 +117,7 @@ static bool sync_native_presentation(void) {
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserReset(void) {
     browser_last_match_result = TW_APPLY_INVALID_MATCH;
+    browser_last_hero_attack_result = HLW_HERO_ATTACK_INVALID_SESSION;
     browser_replay_ok = false;
     browser_native_sync_ok = true;
     browser_hero_ok = true;
@@ -230,6 +234,57 @@ int HLW_BrowserHeroMove(int actor, int x, int y) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int HLW_BrowserHeroAttack(int actor) {
+    if (!browser_initialized || !browser_native_sync_ok || !browser_hero_ok) return 0;
+    if (actor < 0 || actor >= TW_PLAYER_COUNT) {
+        browser_last_hero_attack_result = HLW_HERO_ATTACK_INVALID_ACTOR;
+        return 0;
+    }
+
+    const uint32_t creep_id = HLW_OpenRealmHeroAcquireTarget(
+        (uint8_t)actor, (float)HLW_HERO_BASIC_RANGE_WORLD);
+    if (!creep_id) {
+        browser_last_hero_attack_result = HLW_HERO_ATTACK_INVALID_TARGET;
+        fprintf(stderr, "HLW_BROWSER_HERO_ATTACK=REJECT actor=%d reason=no-legal-target\n", actor);
+        return 0;
+    }
+
+    hlw_hero_attack_outcome_t outcome;
+    browser_last_hero_attack_result = tw_session_hero_attack(
+        &browser_session, (uint8_t)actor, creep_id, &outcome);
+    if (browser_last_hero_attack_result != HLW_HERO_ATTACK_OK) {
+        fprintf(stderr,
+                "HLW_BROWSER_HERO_ATTACK=REJECT actor=%d creep=%u result=%u tick=%llu ready=%llu\n",
+                actor,
+                (unsigned)creep_id,
+                (unsigned)browser_last_hero_attack_result,
+                (unsigned long long)browser_session.match.tick,
+                (unsigned long long)browser_session.hero_ready_tick[actor]);
+        return 0;
+    }
+
+    browser_native_sync_ok = sync_native_presentation();
+    if (!browser_native_sync_ok) {
+        fprintf(stderr,
+                "HLW_BROWSER_HERO_ATTACK=FAIL actor=%d creep=%u reason=native-sync\n",
+                actor, (unsigned)creep_id);
+        return 0;
+    }
+
+    fprintf(stderr,
+            "HLW_BROWSER_HERO_ATTACK=PASS actor=%d creep=%u killed=%u hp=%u reward=%u gold=%u ready=%llu events=%u\n",
+            actor,
+            (unsigned)creep_id,
+            outcome.killed ? 1u : 0u,
+            (unsigned)outcome.remaining_hit_points,
+            (unsigned)outcome.reward_gold,
+            (unsigned)browser_session.match.players[actor].gold,
+            (unsigned long long)browser_session.hero_ready_tick[actor],
+            (unsigned)browser_session.event_count);
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
 int HLW_BrowserHeroEntity(int actor) {
     if (actor < 0 || actor >= TW_PLAYER_COUNT) return 0;
     return (int)HLW_OpenRealmHeroEntityNumber((uint8_t)actor);
@@ -275,8 +330,10 @@ const char *TW_BrowserSnapshot(void) {
                    "{\"initialized\":true,\"tick\":%llu,\"eventCount\":%u,"
                    "\"pendingCount\":%u,\"activeCount\":%u,\"terminal\":%s,"
                    "\"winner\":%u,\"loser\":%u,\"lastSessionResult\":%u,"
-                   "\"lastMatchResult\":%u,\"replayOk\":%s,\"nativeSyncOk\":%s,"
-                   "\"heroOk\":%s,\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
+                   "\"lastMatchResult\":%u,\"lastHeroAttackResult\":%u,"
+                   "\"replayOk\":%s,\"nativeSyncOk\":%s,\"heroOk\":%s,"
+                   "\"heroReady\":[%llu,%llu],"
+                   "\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
                    (unsigned long long)match->tick,
                    (unsigned)browser_session.event_count,
                    (unsigned)match->pending_send_count,
@@ -286,9 +343,12 @@ const char *TW_BrowserSnapshot(void) {
                    (unsigned)match->loser,
                    (unsigned)browser_last_session_result,
                    (unsigned)browser_last_match_result,
+                   (unsigned)browser_last_hero_attack_result,
                    browser_replay_ok ? "true" : "false",
                    browser_native_sync_ok ? "true" : "false",
                    browser_hero_ok ? "true" : "false",
+                   (unsigned long long)browser_session.hero_ready_tick[0],
+                   (unsigned long long)browser_session.hero_ready_tick[1],
                    (unsigned long long)tw_session_state_hash(&browser_session),
                    (unsigned long long)tw_session_log_hash(&browser_session));
 
