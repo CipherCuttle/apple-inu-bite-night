@@ -24,3 +24,14 @@ jobs:
 
       - name: Verify deterministic grid/path contract
         run: /tmp/tower-wars-grid-test
+
+      - name: Compile G2 authoritative build tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/test_tw_match.c \
+            -o /tmp/tower-wars-match-test
+
+      - name: Verify authoritative human/bot build contract
+        run: /tmp/tower-wars-match-test
