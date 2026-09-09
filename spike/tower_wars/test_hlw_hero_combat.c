@@ -74,9 +74,26 @@ int main(void) {
     assert(session.match.players[0].lives == TW_STARTING_LIVES);
 
     const uint32_t gold_after_kill = session.match.players[0].gold;
+    const uint16_t events_after_kill = session.event_count;
+    const uint64_t state_after_kill = tw_session_state_hash(&session);
+    const uint64_t log_after_kill = tw_session_log_hash(&session);
+    assert(tw_session_hero_attack(&session, 0, creep_id, &outcome) == HLW_HERO_ATTACK_COOLDOWN);
+    assert(session.match.players[0].gold == gold_after_kill);
+    assert(session.event_count == events_after_kill);
+    assert(tw_session_state_hash(&session) == state_after_kill);
+    assert(tw_session_log_hash(&session) == log_after_kill);
+
+    assert(tw_session_step(&session, HLW_HERO_BASIC_CADENCE_TICKS) == TW_SESSION_OK);
+    const uint32_t gold_before_retired_retry = session.match.players[0].gold;
+    const uint16_t events_before_retired_retry = session.event_count;
+    const uint64_t state_before_retired_retry = tw_session_state_hash(&session);
+    const uint64_t log_before_retired_retry = tw_session_log_hash(&session);
     assert(tw_session_hero_attack(&session, 0, creep_id, &outcome) ==
            HLW_HERO_ATTACK_INVALID_TARGET);
-    assert(session.match.players[0].gold == gold_after_kill);
+    assert(session.match.players[0].gold == gold_before_retired_retry);
+    assert(session.event_count == events_before_retired_retry);
+    assert(tw_session_state_hash(&session) == state_before_retired_retry);
+    assert(tw_session_log_hash(&session) == log_before_retired_retry);
 
     assert(tw_session_step(&session, 80) == TW_SESSION_OK);
     assert(session.match.active_creep_count == 0);
