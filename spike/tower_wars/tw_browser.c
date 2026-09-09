@@ -27,12 +27,25 @@ extern int HLW_OpenRealmPresentationSyncCreep(uint32_t id,
 extern int HLW_OpenRealmPresentationEnd(void);
 #endif
 
+#ifdef HLW_HERO_V0
+/* Native hero position is authoritative in OpenRealm. Human and bot both enter
+ * through the same actor-indexed command boundary; JS receives only wrappers
+ * and read-only inspection, never the raw native mutation function. */
+extern int HLW_OpenRealmHeroReset(void);
+extern int HLW_OpenRealmHeroCommandMove(uint8_t actor, int x, int y);
+extern int HLW_OpenRealmHeroStep(uint32_t ticks);
+extern uint32_t HLW_OpenRealmHeroEntityNumber(uint8_t actor);
+extern int HLW_OpenRealmHeroX(uint8_t actor);
+extern int HLW_OpenRealmHeroY(uint8_t actor);
+#endif
+
 static tw_session_t browser_session;
 static bool browser_initialized;
 static tw_session_result_t browser_last_session_result = TW_SESSION_MATCH_REJECTED;
 static tw_apply_result_t browser_last_match_result = TW_APPLY_INVALID_MATCH;
 static bool browser_replay_ok;
 static bool browser_native_sync_ok = true;
+static bool browser_hero_ok = true;
 static char browser_json[TW_BROWSER_JSON_CAPACITY];
 
 static size_t appendf(size_t used, const char *format, ...) {
@@ -103,6 +116,7 @@ int TW_BrowserReset(void) {
     browser_last_match_result = TW_APPLY_INVALID_MATCH;
     browser_replay_ok = false;
     browser_native_sync_ok = true;
+    browser_hero_ok = true;
     browser_initialized = tw_session_init(&browser_session,
                                           TW_BROWSER_WIDTH,
                                           TW_BROWSER_HEIGHT,
@@ -117,23 +131,29 @@ int TW_BrowserReset(void) {
                                  sync_native_presentation();
     }
 #endif
-    const bool ready = browser_initialized && browser_native_sync_ok;
+#ifdef HLW_HERO_V0
+    if (browser_initialized && browser_native_sync_ok) {
+        browser_hero_ok = HLW_OpenRealmHeroReset() == 1;
+    }
+#endif
+    const bool ready = browser_initialized && browser_native_sync_ok && browser_hero_ok;
     if (browser_initialized) {
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_RESET=%s seed=%llu gold=%u path0=%u path1=%u native=%s\n",
+                "TOWER_WARS_BROWSER_RESET=%s seed=%llu gold=%u path0=%u path1=%u native=%s hero=%s\n",
                 ready ? "PASS" : "FAIL",
                 (unsigned long long)browser_session.origin.seed,
                 (unsigned)TW_BROWSER_STARTING_GOLD,
                 (unsigned)path_length_for(0),
                 (unsigned)path_length_for(1),
-                browser_native_sync_ok ? "PASS" : "FAIL");
+                browser_native_sync_ok ? "PASS" : "FAIL",
+                browser_hero_ok ? "PASS" : "FAIL");
     }
     return ready ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserBuild(int actor, int tower, int x, int y) {
-    if (!browser_initialized || !browser_native_sync_ok) return 0;
+    if (!browser_initialized || !browser_native_sync_ok || !browser_hero_ok) return 0;
     const tw_action_t action = {
         .actor = (uint8_t)actor,
         .kind = TW_ACTION_BUILD,
@@ -156,7 +176,7 @@ int TW_BrowserBuild(int actor, int tower, int x, int y) {
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserSend(int actor, int creep) {
-    if (!browser_initialized || !browser_native_sync_ok) return 0;
+    if (!browser_initialized || !browser_native_sync_ok || !browser_hero_ok) return 0;
     const tw_action_t action = {
         .actor = (uint8_t)actor,
         .kind = TW_ACTION_SEND,
@@ -176,24 +196,57 @@ int TW_BrowserSend(int actor, int creep) {
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserStep(int ticks) {
-    if (!browser_initialized || !browser_native_sync_ok || ticks < 0) return 0;
+    if (!browser_initialized || !browser_native_sync_ok || !browser_hero_ok || ticks < 0) return 0;
     browser_last_session_result = tw_session_step(&browser_session, (uint32_t)ticks);
     const bool session_ok = browser_last_session_result == TW_SESSION_OK;
     if (session_ok) {
         browser_native_sync_ok = sync_native_presentation();
+#ifdef HLW_HERO_V0
+        if (browser_native_sync_ok) {
+            browser_hero_ok = HLW_OpenRealmHeroStep((uint32_t)ticks) == 1;
+        }
+#endif
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_STEP=%s ticks=%d now=%llu active=%u lives=%u,%u events=%u native=%s\n",
-                browser_native_sync_ok ? "PASS" : "FAIL",
+                "TOWER_WARS_BROWSER_STEP=%s ticks=%d now=%llu active=%u lives=%u,%u events=%u native=%s hero=%s\n",
+                browser_native_sync_ok && browser_hero_ok ? "PASS" : "FAIL",
                 ticks,
                 (unsigned long long)browser_session.match.tick,
                 (unsigned)browser_session.match.active_creep_count,
                 (unsigned)browser_session.match.players[0].lives,
                 (unsigned)browser_session.match.players[1].lives,
                 (unsigned)browser_session.event_count,
-                browser_native_sync_ok ? "PASS" : "FAIL");
+                browser_native_sync_ok ? "PASS" : "FAIL",
+                browser_hero_ok ? "PASS" : "FAIL");
     }
-    return session_ok && browser_native_sync_ok ? 1 : 0;
+    return session_ok && browser_native_sync_ok && browser_hero_ok ? 1 : 0;
 }
+
+#ifdef HLW_HERO_V0
+EMSCRIPTEN_KEEPALIVE
+int HLW_BrowserHeroMove(int actor, int x, int y) {
+    if (!browser_initialized || !browser_native_sync_ok || !browser_hero_ok) return 0;
+    if (actor < 0 || actor >= TW_PLAYER_COUNT) return 0;
+    return HLW_OpenRealmHeroCommandMove((uint8_t)actor, x, y) == 1 ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int HLW_BrowserHeroEntity(int actor) {
+    if (actor < 0 || actor >= TW_PLAYER_COUNT) return 0;
+    return (int)HLW_OpenRealmHeroEntityNumber((uint8_t)actor);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int HLW_BrowserHeroX(int actor) {
+    if (actor < 0 || actor >= TW_PLAYER_COUNT) return 0;
+    return HLW_OpenRealmHeroX((uint8_t)actor);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int HLW_BrowserHeroY(int actor) {
+    if (actor < 0 || actor >= TW_PLAYER_COUNT) return 0;
+    return HLW_OpenRealmHeroY((uint8_t)actor);
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserReplayVerify(void) {
@@ -223,7 +276,7 @@ const char *TW_BrowserSnapshot(void) {
                    "\"pendingCount\":%u,\"activeCount\":%u,\"terminal\":%s,"
                    "\"winner\":%u,\"loser\":%u,\"lastSessionResult\":%u,"
                    "\"lastMatchResult\":%u,\"replayOk\":%s,\"nativeSyncOk\":%s,"
-                   "\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
+                   "\"heroOk\":%s,\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
                    (unsigned long long)match->tick,
                    (unsigned)browser_session.event_count,
                    (unsigned)match->pending_send_count,
@@ -235,6 +288,7 @@ const char *TW_BrowserSnapshot(void) {
                    (unsigned)browser_last_match_result,
                    browser_replay_ok ? "true" : "false",
                    browser_native_sync_ok ? "true" : "false",
+                   browser_hero_ok ? "true" : "false",
                    (unsigned long long)tw_session_state_hash(&browser_session),
                    (unsigned long long)tw_session_log_hash(&browser_session));
 
