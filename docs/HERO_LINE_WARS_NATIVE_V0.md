@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -110,9 +110,45 @@ Closure evidence:
 - Carry-forward Medium: H3 replay reproduces accepted attack effects/cadence, but native range legality is not replayed because native hero movement is not yet in the session log; H7 explicitly owns full replay/native consistency.
 - Carry-forward Medium: nearest/creep-ID target ordering is deterministic in implementation, but H3 browser evidence exercises a single legal target rather than a multi-target tie case.
 
-### H4 — HERO_ABILITY_V0
+### H4 — HERO_ABILITY_V0 — PASS
 
 One original active hero ability is available to both seats through the same authority path, with deterministic cooldown/cost/targeting/effect semantics and fail-closed invalid casts.
+
+Frozen H4 ability: **PHASE LANCE**.
+
+- Damage: `60`.
+- Cooldown: `12` authoritative match ticks.
+- Cost: `15` authoritative gold.
+- Native server target range: `128` OpenRealm world units.
+- A lethal cast uses the frozen H3 combat-kill reward: `20` gold.
+- Target ordering is the same native nearest-incoming-creep / creep-ID tie-break used by H3.
+
+Authority path:
+
+`native OpenRealm hero position + session-derived native creep mirror → legal target ID → tw_session_hero_ability → authoritative gold/cooldown/creep HP/kill/reward/event → H1 native mirror sync/removal`
+
+The browser may request only `HLW_BrowserHeroAbility(actor)`. It cannot supply target ID, range, damage, cost, cooldown, HP, reward or retirement state. Human and bot seats use the same actor-indexed public cast boundary; no bot-only ability mutation path exists.
+
+Closure evidence:
+
+- Candidate head: `1a5f083f940c65b6336faa605d1ff45909096241`.
+- GitHub Actions run: `34403426017` — PASS.
+- Artifact: `hero-line-wars-native-h4-v0`, ID `10124414057`, SHA-256 `9d3865ee3c61f95e6f55c49c65d99b70c92da068136cb962af7a5eae9db70a8b`.
+- Deterministic H3 and H4 host authority tests passed before the OpenRealm build.
+- H1 native-creep, H2 movement/reset and H3 basic-combat regressions remained PASS in the same Wasm artifact.
+- Wrong-seat actor 1 could not cast PHASE LANCE on actor 0's incoming creep; the rejected cast left authoritative state/log/HP unchanged.
+- Actor 0 acquired creep `1` / native edict `28` at the frozen `128` world-unit range and cast PHASE LANCE through the shared browser command.
+- First cast changed authoritative HP `70 → 10`, charged exactly `15` gold (`500 → 485`), granted no kill reward and set ability readiness to tick `13`.
+- An immediate second cast was rejected by the `12`-tick cooldown without changing authoritative HP, gold, state hash or log hash.
+- At tick `13`, the second cast killed creep `1`, charged `15`, granted the existing `20` combat-kill reward, produced actor-0 gold `490`, set readiness to tick `25`, and removed the same native edict `28`.
+- A post-kill cast could not reacquire the retired creep and granted no second reward.
+- Browser replay verification reproduced the accepted PHASE LANCE events and authoritative state/log hashes.
+- After reset, actor 1 was moved through the ordinary H2 command path, received an incoming swarm, and successfully used the same `HLW_BrowserHeroAbility(1)` command; that cast produced HP `10`, cost `15`, and readiness `tick + 12`.
+- Final evidence reported `bothSeatsSameCommand=true`, `replayOk=true`, and `finalWebGL2=true`.
+- Hostile review of the complete H3-closure→H4 delta: `C0 / H0`; no repair or targeted re-review cycle required.
+- Carry-forward Medium: PHASE LANCE inherits H3's coarse server-cell target coordinates rather than applying creep `progress_milli`; renderer interpolation can therefore be visually finer-grained than range legality.
+- Carry-forward Medium: full native positional legality is not reconstructed by session replay yet because native hero movement is not in the ordered session log; H7 explicitly owns that consistency gate.
+- Carry-forward Medium: H3/H4 currently duplicate a small active-creep retirement helper; H5 should consolidate kill reward/XP/retirement into one deterministic resolution path rather than adding a third copy.
 
 ### H5 — HERO_XP_LEVEL_V0
 
