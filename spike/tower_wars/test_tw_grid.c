@@ -34,10 +34,11 @@ static void legal_placement_reroutes(void) {
     assert(!same_path(&before, &after));
     assert(grid.blocked[2 * grid.width + 3] == 1);
 
-    /* Tie-break is frozen N,E,S,W, so the first detour goes north. */
-    assert(after.length >= 3);
-    assert(after.cells[1].x == 1 && after.cells[1].y == 2);
+    /* Tie-break is frozen N,E,S,W. The direct route reaches x=2 before the
+     * blocker and then chooses the north detour before the south detour. */
+    assert(after.length >= 5);
     assert(after.cells[2].x == 2 && after.cells[2].y == 2);
+    assert(after.cells[3].x == 2 && after.cells[3].y == 1);
 }
 
 static void full_block_rejected_without_mutation(void) {
@@ -46,15 +47,10 @@ static void full_block_rejected_without_mutation(void) {
 
     assert(tw_grid_init(&grid, 5, 3, (tw_cell_t){0, 1}, (tw_cell_t){4, 1}));
 
-    /* Build two walls with a single remaining gap at x=2,y=1. */
-    for (uint8_t x = 0; x < grid.width; ++x) {
-        if (x != 2) {
-            assert(tw_grid_try_place(&grid, (tw_cell_t){x, 0}, NULL));
-            assert(tw_grid_try_place(&grid, (tw_cell_t){x, 2}, NULL));
-        }
-    }
-    assert(tw_grid_try_place(&grid, (tw_cell_t){1, 1}, NULL));
-    assert(tw_grid_try_place(&grid, (tw_cell_t){3, 1}, NULL));
+    /* Column x=2 is the only separator needed. Top and bottom placements are
+     * individually legal; filling the center would sever entrance from exit. */
+    assert(tw_grid_try_place(&grid, (tw_cell_t){2, 0}, NULL));
+    assert(tw_grid_try_place(&grid, (tw_cell_t){2, 2}, NULL));
 
     const uint64_t before = tw_grid_hash(&grid);
     assert(!tw_grid_try_place(&grid, (tw_cell_t){2, 1}, &path));
