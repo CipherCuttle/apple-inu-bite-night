@@ -13,22 +13,29 @@ permissions:
   contents: read
 
 jobs:
-  h1-h3-native-authority:
+  h1-h4-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile H3 deterministic hero combat test
+      - name: Compile deterministic H3 H4 authority tests
         run: |
+          common=(
+            spike/tower_wars/tw_grid.c
+            spike/tower_wars/tw_match.c
+            spike/tower_wars/tw_replay.c
+            spike/tower_wars/tw_hero_combat.c
+            spike/tower_wars/tw_hero_ability.c
+          )
           gcc -std=c11 -O2 -Wall -Wextra -Werror \
-            spike/tower_wars/tw_grid.c \
-            spike/tower_wars/tw_match.c \
-            spike/tower_wars/tw_replay.c \
-            spike/tower_wars/tw_hero_combat.c \
-            spike/tower_wars/test_hlw_hero_combat.c \
+            "${common[@]}" spike/tower_wars/test_hlw_hero_combat.c \
             -o /tmp/hlw-hero-combat-test
           /tmp/hlw-hero-combat-test
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            "${common[@]}" spike/tower_wars/test_hlw_hero_ability.c \
+            -o /tmp/hlw-hero-ability-test
+          /tmp/hlw-hero-ability-test
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v10
@@ -73,7 +80,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 H2 regressions and H3 basic combat
+      - name: Prove H1 H2 H3 regressions and H4 Phase Lance
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -98,11 +105,13 @@ jobs:
             timeout 120s node spike/tower_wars/h2_reset_reuse_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h3_basic_combat_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h4_hero_ability_smoke.mjs
 
-      - name: Upload H3 Wasm artifact
+      - name: Upload H4 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h3-v0
+          name: hero-line-wars-native-h4-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
