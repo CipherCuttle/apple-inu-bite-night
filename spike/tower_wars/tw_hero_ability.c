@@ -55,7 +55,7 @@ hlw_hero_ability_result_t tw_session_hero_ability(
     if (killing) {
         hlw_hero_kill_outcome_t kill_outcome;
         const hlw_hero_kill_resolve_result_t kill_result = tw_session_resolve_hero_kill(
-            &candidate, actor, creep_id, &kill_outcome);
+            &candidate, actor, creep_id, HLW_HERO_ABILITY_DAMAGE, &kill_outcome);
         if (kill_result == HLW_HERO_KILL_RESOLVE_GOLD_OVERFLOW) {
             return HLW_HERO_ABILITY_ECONOMY_OVERFLOW;
         }
