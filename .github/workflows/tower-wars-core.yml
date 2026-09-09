@@ -57,3 +57,14 @@ jobs:
 
       - name: Verify deterministic creep routing and leak contract
         run: /tmp/tower-wars-creep-test
+
+      - name: Compile G5 tower combat tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/test_tw_combat.c \
+            -o /tmp/tower-wars-combat-test
+
+      - name: Verify deterministic tower combat contract
+        run: /tmp/tower-wars-combat-test
