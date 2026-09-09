@@ -2,11 +2,11 @@ name: hero-line-wars-native
 
 on:
   push:
-    branches: [phase-hlw/openrealm-native-v0]
+    branches: [phase-hlw/openrealm-native-v0, repair/h7-progress-legality-v0]
   workflow_dispatch:
 
 concurrency:
-  group: hero-line-wars-native-v0
+  group: hero-line-wars-native-v0-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -70,10 +70,12 @@ jobs:
           python3 ../spike/tower_wars/patch_hlw_hero_reset_reuse.py
           python3 ../spike/tower_wars/patch_hlw_basic_combat.py
           python3 ../spike/tower_wars/patch_hlw_h7_native_state.py
+          python3 ../spike/tower_wars/patch_hlw_h7_progress_native.py
           git diff --check
 
       - name: Inject deterministic session, H7 journal and preserve menu isolation
         run: |
+          python3 spike/tower_wars/patch_hlw_h7_progress_browser.py
           python3 spike/tower_wars/patch_hlw_h7_command_journal.py
           git diff --check
           python3 spike/wasm/patch_menu_object_isolation.py
@@ -118,6 +120,8 @@ jobs:
             timeout 120s node spike/tower_wars/h5_hero_progression_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h6_bot_parity_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h7_progress_legality_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h7_replay_native_smoke.mjs
 
