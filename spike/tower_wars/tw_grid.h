@@ -29,6 +29,8 @@ typedef struct {
 
 bool tw_grid_init(tw_grid_t *grid, uint8_t width, uint8_t height,
                   tw_cell_t entrance, tw_cell_t exit);
+bool tw_grid_find_path_between(const tw_grid_t *grid, tw_cell_t start, tw_cell_t goal,
+                               tw_path_t *path);
 bool tw_grid_find_path(const tw_grid_t *grid, tw_path_t *path);
 bool tw_grid_try_place(tw_grid_t *grid, tw_cell_t cell, tw_path_t *resulting_path);
 uint64_t tw_grid_hash(const tw_grid_t *grid);
