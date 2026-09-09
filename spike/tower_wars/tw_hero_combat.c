@@ -27,6 +27,7 @@ hlw_hero_kill_resolve_result_t tw_session_resolve_hero_kill(
     tw_session_t *session,
     uint8_t actor,
     uint32_t creep_id,
+    uint32_t lethal_damage,
     hlw_hero_kill_outcome_t *outcome_out) {
     if (outcome_out) memset(outcome_out, 0, sizeof(*outcome_out));
     if (!session) return HLW_HERO_KILL_RESOLVE_INVALID_SESSION;
@@ -35,7 +36,7 @@ hlw_hero_kill_resolve_result_t tw_session_resolve_hero_kill(
     const int found = find_creep_index(&session->match, creep_id);
     if (found < 0) return HLW_HERO_KILL_RESOLVE_INVALID_TARGET;
     const tw_creep_t *current = &session->match.active_creeps[found];
-    if (current->target != actor || current->hit_points == 0) {
+    if (current->target != actor || current->hit_points == 0 || lethal_damage < current->hit_points) {
         return HLW_HERO_KILL_RESOLVE_INVALID_TARGET;
     }
     if (session->match.players[actor].gold > UINT32_MAX - HLW_HERO_KILL_GOLD_REWARD) {
@@ -108,7 +109,7 @@ hlw_hero_attack_result_t tw_session_hero_attack(
     if (killing) {
         hlw_hero_kill_outcome_t kill_outcome;
         const hlw_hero_kill_resolve_result_t kill_result = tw_session_resolve_hero_kill(
-            &candidate, actor, creep_id, &kill_outcome);
+            &candidate, actor, creep_id, damage, &kill_outcome);
         if (kill_result == HLW_HERO_KILL_RESOLVE_GOLD_OVERFLOW) {
             return HLW_HERO_ATTACK_ECONOMY_OVERFLOW;
         }
