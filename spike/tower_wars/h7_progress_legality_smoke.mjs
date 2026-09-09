@@ -62,7 +62,7 @@ try {
   // Hero x=-60 is 90 units away (legal at range 96); the old coarse mirror at
   // x=-160 is 100 units away and would incorrectly reject the same attack.
   await expectOne(page, () => Module._HLW_BrowserHeroMove(0, -60, -82), 'H7 progress hero move')
-  await expectOne(page, () => Module._TW_BrowserStep(8), 'H7 progress settle hero')
+  await expectOne(page, () => Module._TW_BrowserStep(16), 'H7 progress settle hero')
 
   const hero = await page.evaluate(() => [Module._HLW_BrowserHeroX(0), Module._HLW_BrowserHeroY(0)])
   if (JSON.stringify(hero) !== JSON.stringify([-60, -82])) {
