@@ -60,14 +60,16 @@ typedef struct {
 
 /*
  * Shared deterministic hero-kill resolution used by basic attack and Phase Lance.
- * It retires one incoming creep exactly once, grants combat gold + XP exactly once,
- * applies the single H5 level transition, and never handles tower/leak retirement.
- * Callers use a candidate session so any failure remains non-mutating.
+ * It verifies the supplied authoritative damage is lethal, retires one incoming
+ * creep exactly once, grants combat gold + XP exactly once, applies the single
+ * H5 level transition, and never handles tower/leak retirement. Callers use a
+ * candidate session so any failure remains non-mutating.
  */
 hlw_hero_kill_resolve_result_t tw_session_resolve_hero_kill(
     tw_session_t *session,
     uint8_t actor,
     uint32_t creep_id,
+    uint32_t lethal_damage,
     hlw_hero_kill_outcome_t *outcome_out);
 
 /*
