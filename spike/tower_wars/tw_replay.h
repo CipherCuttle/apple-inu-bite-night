@@ -52,6 +52,10 @@ typedef struct {
     uint64_t hero_ready_tick[TW_PLAYER_COUNT];
     /* Earliest authoritative match tick at which each seat may cast Phase Lance. */
     uint64_t hero_ability_ready_tick[TW_PLAYER_COUNT];
+    /* H5 authoritative progression. Reset/replay rebuild these from session origin + events. */
+    uint32_t hero_xp[TW_PLAYER_COUNT];
+    uint8_t hero_level[TW_PLAYER_COUNT];
+    uint32_t hero_basic_damage[TW_PLAYER_COUNT];
     uint16_t event_count;
     tw_event_t events[TW_MAX_LOG_EVENTS];
 } tw_session_t;
