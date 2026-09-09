@@ -22,13 +22,18 @@ typedef enum {
     HLW_HERO_ABILITY_ECONOMY_OVERFLOW,
     HLW_HERO_ABILITY_LOG_CAPACITY,
     HLW_HERO_ABILITY_TICK_OVERFLOW,
+    HLW_HERO_ABILITY_PROGRESSION_OVERFLOW,
 } hlw_hero_ability_result_t;
 
 typedef struct {
     bool killed;
     uint32_t remaining_hit_points;
     uint32_t reward_gold;
+    uint32_t reward_xp;
     uint32_t gold_cost;
+    bool leveled;
+    uint8_t hero_level;
+    uint32_t hero_basic_damage;
 } hlw_hero_ability_outcome_t;
 
 /*
@@ -36,8 +41,8 @@ typedef struct {
  *
  * Native OpenRealm position establishes range/target legality. This session
  * function owns cost, cooldown, deterministic damage, kill retirement, combat
- * reward and replay logging. It independently rejects any creep not incoming
- * to the casting seat.
+ * reward/progression and replay logging. It independently rejects any creep not
+ * incoming to the casting seat.
  */
 hlw_hero_ability_result_t tw_session_hero_ability(
     tw_session_t *session,
