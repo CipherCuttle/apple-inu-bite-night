@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenRealm WebAssembly Spike</title>
+  <style>
+    html,body{margin:0;background:#08070b;color:#ddd;font-family:monospace;height:100%}
+    #status{position:fixed;z-index:3;left:12px;top:10px;background:#000a;padding:8px 10px}
+    canvas{display:block;width:100vw;height:100vh}
+  </style>
+</head>
+<body>
+<div id="status">booting OpenRealm wasm…</div>
+<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+<script>
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    arguments: ['-data', '/share', '+map', '__wasm_smoke__'],
+    print: (...args) => console.log(...args),
+    printErr: (...args) => console.error(...args),
+    setStatus: (text) => { document.getElementById('status').textContent = text || 'OpenRealm wasm running'; },
+    onRuntimeInitialized: () => { document.getElementById('status').textContent = 'OpenRealm wasm runtime initialized'; },
+    onAbort: (reason) => { document.getElementById('status').textContent = `OPENREALM_ABORT=${reason}`; }
+  };
+</script>
+<script async type="text/javascript" src="openrealm.js"></script>
+</body>
+</html>

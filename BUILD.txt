@@ -1,0 +1,3 @@
+source_branch=pivot/openrealm-wasm-spike-v0
+source_sha=0d8d9368140f9242652ebf30cf1816b0fd12f647
+openrealm_sha=cf12357883950c14abce8d636596952c3fc547bb
