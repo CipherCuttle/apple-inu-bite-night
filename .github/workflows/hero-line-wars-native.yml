@@ -13,11 +13,22 @@ permissions:
   contents: read
 
 jobs:
-  h1-h2-native-authority:
+  h1-h3-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+
+      - name: Compile H3 deterministic hero combat test
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/tw_replay.c \
+            spike/tower_wars/tw_hero_combat.c \
+            spike/tower_wars/test_hlw_hero_combat.c \
+            -o /tmp/hlw-hero-combat-test
+          /tmp/hlw-hero-combat-test
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v10
@@ -46,6 +57,7 @@ jobs:
           python3 ../spike/tower_wars/patch_hlw_native_creep.py
           python3 ../spike/tower_wars/patch_hlw_native_hero.py
           python3 ../spike/tower_wars/patch_hlw_hero_reset_reuse.py
+          python3 ../spike/tower_wars/patch_hlw_basic_combat.py
           git diff --check
 
       - name: Inject deterministic session and preserve menu isolation
@@ -61,7 +73,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 regression and H2 shared hero authority
+      - name: Prove H1 H2 regressions and H3 basic combat
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -84,11 +96,13 @@ jobs:
             timeout 120s node spike/tower_wars/h2_hero_command_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h2_reset_reuse_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h3_basic_combat_smoke.mjs
 
-      - name: Upload H2 Wasm artifact
+      - name: Upload H3 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h2-v0
+          name: hero-line-wars-native-h3-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
