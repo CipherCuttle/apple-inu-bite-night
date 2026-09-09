@@ -8,9 +8,11 @@
 
 #define TW_PLAYER_COUNT 2
 #define TW_MAX_TOWERS_PER_PLAYER TW_GRID_MAX_CELLS
-#define TW_MAX_PENDING_SENDS 256
+#define TW_MAX_CREEPS 256
+#define TW_MAX_PENDING_SENDS TW_MAX_CREEPS
 #define TW_STARTING_INCOME 10
 #define TW_INCOME_PERIOD_TICKS 20
+#define TW_STARTING_LIVES 20
 
 typedef enum {
     TW_TOWER_NEEDLE = 0,
@@ -59,8 +61,19 @@ typedef struct {
 } tw_pending_send_t;
 
 typedef struct {
+    uint32_t id;
+    uint8_t sender;
+    uint8_t target;
+    tw_creep_kind_t kind;
+    uint32_t hit_points;
+    tw_cell_t cell;
+    uint16_t progress_milli;
+} tw_creep_t;
+
+typedef struct {
     uint32_t gold;
     uint32_t income;
+    uint16_t lives;
     tw_grid_t grid;
     uint16_t tower_count;
     tw_tower_t towers[TW_MAX_TOWERS_PER_PLAYER];
@@ -73,6 +86,8 @@ typedef struct {
     uint64_t tick;
     uint16_t pending_send_count;
     tw_pending_send_t pending_sends[TW_MAX_PENDING_SENDS];
+    uint16_t active_creep_count;
+    tw_creep_t active_creeps[TW_MAX_CREEPS];
 } tw_match_t;
 
 typedef enum {
@@ -120,7 +135,10 @@ const tw_creep_def_t *tw_creep_def(tw_creep_kind_t kind);
 
 tw_apply_result_t tw_match_apply_action(tw_match_t *match, const tw_action_t *action);
 
-/* Advance only the deterministic periodic-income clock for G3. */
+/* Advance the authoritative deterministic simulation by whole ticks. */
+bool tw_match_step(tw_match_t *match, uint32_t ticks);
+
+/* Compatibility name retained for the G3 tests; it advances the same clock. */
 bool tw_match_advance_income(tw_match_t *match, uint32_t ticks);
 
 /* Pure deterministic planner: chooses an action but never mutates match state. */
