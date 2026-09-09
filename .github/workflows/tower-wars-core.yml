@@ -35,3 +35,14 @@ jobs:
 
       - name: Verify authoritative human/bot build contract
         run: /tmp/tower-wars-match-test
+
+      - name: Compile G3 send and income tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/tw_match.c \
+            spike/tower_wars/test_tw_send.c \
+            -o /tmp/tower-wars-send-test
+
+      - name: Verify authoritative send and periodic income contract
+        run: /tmp/tower-wars-send-test
