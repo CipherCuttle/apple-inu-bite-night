@@ -12,18 +12,6 @@ static int find_creep_index(const tw_match_t *match, uint32_t creep_id) {
     return -1;
 }
 
-static void remove_active_creep(tw_match_t *match, uint16_t index) {
-    if (!match || index >= match->active_creep_count) return;
-    const uint16_t remaining = (uint16_t)(match->active_creep_count - index - 1);
-    if (remaining) {
-        memmove(&match->active_creeps[index],
-                &match->active_creeps[index + 1],
-                (size_t)remaining * sizeof(match->active_creeps[0]));
-    }
-    match->active_creep_count--;
-    memset(&match->active_creeps[match->active_creep_count], 0, sizeof(match->active_creeps[0]));
-}
-
 hlw_hero_ability_result_t tw_session_hero_ability(
     tw_session_t *session,
     uint8_t actor,
@@ -54,22 +42,35 @@ hlw_hero_ability_result_t tw_session_hero_ability(
     const bool killing = HLW_HERO_ABILITY_DAMAGE >= current->hit_points;
     const uint32_t gold_after_cost =
         session->match.players[actor].gold - HLW_HERO_ABILITY_GOLD_COST;
-    if (killing && gold_after_cost > UINT32_MAX - HLW_HERO_KILL_GOLD_REWARD) {
-        return HLW_HERO_ABILITY_ECONOMY_OVERFLOW;
-    }
 
     tw_session_t candidate = *session;
     tw_creep_t *creep = &candidate.match.active_creeps[found];
     hlw_hero_ability_outcome_t outcome = {
         .gold_cost = HLW_HERO_ABILITY_GOLD_COST,
+        .hero_level = candidate.hero_level[actor],
+        .hero_basic_damage = candidate.hero_basic_damage[actor],
     };
 
     candidate.match.players[actor].gold = gold_after_cost;
     if (killing) {
-        candidate.match.players[actor].gold += HLW_HERO_KILL_GOLD_REWARD;
+        hlw_hero_kill_outcome_t kill_outcome;
+        const hlw_hero_kill_resolve_result_t kill_result = tw_session_resolve_hero_kill(
+            &candidate, actor, creep_id, &kill_outcome);
+        if (kill_result == HLW_HERO_KILL_RESOLVE_GOLD_OVERFLOW) {
+            return HLW_HERO_ABILITY_ECONOMY_OVERFLOW;
+        }
+        if (kill_result == HLW_HERO_KILL_RESOLVE_XP_OVERFLOW) {
+            return HLW_HERO_ABILITY_PROGRESSION_OVERFLOW;
+        }
+        if (kill_result != HLW_HERO_KILL_RESOLVE_OK) {
+            return HLW_HERO_ABILITY_INVALID_TARGET;
+        }
         outcome.killed = true;
-        outcome.reward_gold = HLW_HERO_KILL_GOLD_REWARD;
-        remove_active_creep(&candidate.match, (uint16_t)found);
+        outcome.reward_gold = kill_outcome.reward_gold;
+        outcome.reward_xp = kill_outcome.reward_xp;
+        outcome.leveled = kill_outcome.leveled;
+        outcome.hero_level = kill_outcome.hero_level;
+        outcome.hero_basic_damage = kill_outcome.hero_basic_damage;
     } else {
         creep->hit_points -= HLW_HERO_ABILITY_DAMAGE;
         outcome.remaining_hit_points = creep->hit_points;
