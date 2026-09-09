@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: PREREGISTERED / NOT YET IMPLEMENTED
+Status: IMPLEMENTING — H1 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -32,9 +32,22 @@ The previous tower/path kernel is retained as tested infrastructure and optional
 
 ## Acceptance gates
 
-### H1 — NATIVE_ENTITY_BRIDGE_V0
+### H1 — NATIVE_ENTITY_BRIDGE_V0 — PASS
 
 At least one Tower Wars creep from an accepted `tw_session_*` send is represented by a real OpenRealm server/game entity, crosses the normal server→client snapshot boundary and is rendered from that native entity state. No duplicate simulation authority may emerge.
+
+Closure evidence:
+
+- Candidate head: `fea5c56e866a9cc835d87852b38120c400e1dbdc`.
+- GitHub Actions run: `34399229954` — PASS.
+- Artifact: `hero-line-wars-native-h1-v0`, ID `10122790803`, SHA-256 `4ae40d46d08303acadab915a26302d22e7b78a76510b9ad7e350b1c9d1741222`.
+- Authoritative session creep `1` was mirrored as OpenRealm edict `26`.
+- The same entity number crossed server snapshot → client entity → renderer draw.
+- Session movement `(0,3) → (1,3)` moved the same native edict; session retirement removed the same native edict.
+- OpenRealm WebGL2 remained alive through the proof.
+- Hostile review: 1 High — browser mutation boundary could report success after native presentation desync.
+- High repair: partial mirrors clear fail-closed; reset/step surface native-sync failure; build/send/step freeze while presentation is degraded until reset.
+- Targeted re-review after the High repair: `C0 / H0`.
 
 ### H2 — HERO_ENTITY_COMMAND_V0
 
