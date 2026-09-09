@@ -148,6 +148,13 @@ try {
   if (abilityHit.creeps[0]?.hp !== 10 || abilityHit.heroXP[1] !== 0) {
     throw new Error(`H6 bot ability damage diverged: ${JSON.stringify(abilityHit)}`)
   }
+
+  // H7 range legality is progress-aware. Keep H6 on the exact same public
+  // actor-indexed movement boundary while the Swarm advances through cooldown;
+  // there is still no bot-only position mutation path.
+  if (await page.evaluate(() => Module._HLW_BrowserHeroMove(1, -60, 82)) !== 1) {
+    throw new Error('H6 bot pursuit through shared movement boundary rejected')
+  }
   await step(page, 12, 'H6 ability cooldown')
   if (await page.evaluate(() => Module._HLW_BrowserHeroAbility(1)) !== 1) {
     throw new Error('H6 bot lethal PHASE LANCE rejected')
