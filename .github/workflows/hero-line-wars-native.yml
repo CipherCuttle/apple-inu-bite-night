@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  h1-native-creep-bridge:
+  h1-h2-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -31,7 +31,7 @@ jobs:
           git -C open-realm checkout cf12357883950c14abce8d636596952c3fc547bb
           test "$(git -C open-realm rev-parse HEAD)" = "cf12357883950c14abce8d636596952c3fc547bb"
 
-      - name: Apply proven OpenRealm browser overlays
+      - name: Apply proven OpenRealm and Hero Line Wars overlays
         run: |
           cd open-realm
           python3 ../spike/wasm/patch_openrealm.py
@@ -44,6 +44,7 @@ jobs:
           python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
           python3 ../spike/wasm/patch_wasm_selection_ring.py
           python3 ../spike/tower_wars/patch_hlw_native_creep.py
+          python3 ../spike/tower_wars/patch_hlw_native_hero.py
           git diff --check
 
       - name: Inject deterministic session and preserve menu isolation
@@ -56,9 +57,10 @@ jobs:
         env:
           TW_BROWSER_V0: "1"
           HLW_NATIVE_V0: "1"
+          HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove session creep through native server client renderer path
+      - name: Prove H1 regression and H2 shared hero authority
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -77,11 +79,13 @@ jobs:
           npm install --no-save --ignore-scripts puppeteer-core@24.16.0
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h1_native_entity_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h2_hero_command_smoke.mjs
 
-      - name: Upload H1 Wasm artifact
+      - name: Upload H2 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h1-v0
+          name: hero-line-wars-native-h2-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
