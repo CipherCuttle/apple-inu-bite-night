@@ -124,12 +124,71 @@ try {
   }
   const firstCreep = firstActive.creeps[0]
 
-  const activeShot = await page.$('#tw-root')
-  if (!activeShot) throw new Error('Tower Wars UI root missing')
-  const activePng = await activeShot.screenshot({ type: 'png', path: 'tower-wars-active.png' })
+  /* ElementHandle.screenshot() on a fixed, full-viewport overlay can produce an
+   * incomplete compositor capture when the page also owns an active WebGL
+   * canvas. Prove layout/style/stacking independently, then inspect the actual
+   * composited viewport screenshot rather than a clipped element capture. */
+  const layout = await page.evaluate(() => {
+    const root = document.getElementById('tw-root')
+    const field = document.querySelector('.field-card')
+    const grid = document.querySelector('.grid')
+    const cell = document.querySelector('.cell.path')
+    const tower = document.querySelector('.tower')
+    const creep = document.querySelector('.creep')
+    const rect = (el) => {
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, width: r.width, height: r.height }
+    }
+    const style = (el) => {
+      if (!el) return null
+      const s = getComputedStyle(el)
+      return {
+        display: s.display,
+        visibility: s.visibility,
+        opacity: s.opacity,
+        backgroundColor: s.backgroundColor,
+        borderColor: s.borderColor,
+        color: s.color,
+        zIndex: s.zIndex,
+      }
+    }
+    const center = document.elementFromPoint(innerWidth / 2, innerHeight / 2)
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      rootRect: rect(root), fieldRect: rect(field), gridRect: rect(grid),
+      cellRect: rect(cell), towerRect: rect(tower), creepRect: rect(creep),
+      rootStyle: style(root), fieldStyle: style(field), cellStyle: style(cell),
+      towerStyle: style(tower), creepStyle: style(creep),
+      centerOwnedByTowerWars: Boolean(root && center && root.contains(center)),
+      centerTag: center?.tagName ?? null,
+      centerId: center?.id ?? null,
+      centerClass: center?.className ?? null,
+    }
+  })
+  console.log(`TOWER_WARS_G8_LAYOUT=${JSON.stringify(layout)}`)
+  if (!layout.rootRect || layout.rootRect.width < 1200 || layout.rootRect.height < 680 ||
+      !layout.fieldRect || layout.fieldRect.width < 400 || layout.fieldRect.height < 300 ||
+      !layout.gridRect || layout.gridRect.width < 350 || layout.gridRect.height < 250 ||
+      !layout.cellRect || layout.cellRect.width < 20 || layout.cellRect.height < 20 ||
+      !layout.towerRect || layout.towerRect.width < 8 || layout.towerRect.height < 8 ||
+      !layout.creepRect || layout.creepRect.width < 6 || layout.creepRect.height < 6 ||
+      layout.rootStyle?.display === 'none' || layout.rootStyle?.visibility === 'hidden' ||
+      Number(layout.rootStyle?.opacity ?? 0) <= 0 || !layout.centerOwnedByTowerWars) {
+    throw new Error(`Tower Wars DOM is not visibly laid out above OpenRealm: ${JSON.stringify(layout)}`)
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  const activePng = await page.screenshot({
+    type: 'png',
+    path: 'tower-wars-active.png',
+    fullPage: false,
+    captureBeyondViewport: false,
+  })
   const activeVisual = inspectPng(activePng)
+  console.log(`TOWER_WARS_G8_VISUAL=${JSON.stringify(activeVisual)}`)
   if (activeVisual.nonDarkRatio < 0.25 || activeVisual.colorfulRatio < 0.01) {
-    throw new Error(`Tower Wars vertical slice is not meaningfully visible: ${JSON.stringify(activeVisual)}`)
+    throw new Error(`Tower Wars composited viewport is not meaningfully visible: ${JSON.stringify({ activeVisual, layout })}`)
   }
 
   for (let i = 0; i < 8; i++) {
@@ -197,6 +256,7 @@ try {
     stateHash: replayed.stateHash,
     logHash: replayed.logHash,
     events: replayed.eventCount,
+    layout,
     visual: activeVisual,
     finalRuntime,
   }
