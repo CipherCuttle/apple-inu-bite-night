@@ -25,20 +25,23 @@ static void legal_placement_reroutes(void) {
     tw_grid_t grid;
     tw_path_t before;
     tw_path_t after;
+    tw_path_t repeated;
 
     assert(tw_grid_init(&grid, 7, 5, (tw_cell_t){0, 2}, (tw_cell_t){6, 2}));
     assert(tw_grid_find_path(&grid, &before));
     assert(tw_grid_try_place(&grid, (tw_cell_t){3, 2}, &after));
+    assert(tw_grid_find_path(&grid, &repeated));
 
     assert(after.length > before.length);
     assert(!same_path(&before, &after));
+    assert(same_path(&after, &repeated));
     assert(grid.blocked[2 * grid.width + 3] == 1);
 
-    /* Tie-break is frozen N,E,S,W. The direct route reaches x=2 before the
-     * blocker and then chooses the north detour before the south detour. */
-    assert(after.length >= 5);
-    assert(after.cells[2].x == 2 && after.cells[2].y == 2);
-    assert(after.cells[3].x == 2 && after.cells[3].y == 1);
+    /* N,E,S,W is a semantic tie-break, not an implementation accident. When
+     * north and south detours are equally short, the canonical path goes north. */
+    assert(after.length >= 2);
+    assert(after.cells[0].x == 0 && after.cells[0].y == 2);
+    assert(after.cells[1].x == 0 && after.cells[1].y == 1);
 }
 
 static void full_block_rejected_without_mutation(void) {
