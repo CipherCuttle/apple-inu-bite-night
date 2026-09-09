@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS / H6 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -183,9 +183,26 @@ Closure evidence:
 - Carry-forward Medium: the shared lethal resolver is a cross-file internal helper rather than an opaque private symbol. Product/browser ingress cannot call it, but H6/H7 must not widen or bypass this mutation surface.
 - Carry-forward Medium: H5 intentionally does not resolve H3/H4's coarse creep-position range legality or missing native-movement replay; H7 owns full replay/native consistency.
 
-### H6 — BOT_PARITY_V0
+### H6 — BOT_PARITY_V0 — PASS
 
 The bot can move, attack, cast and send only through the same public authority interfaces available to the human. A hostile test demonstrates no bot-only mutation path for HP, position, gold, income, XP or lives.
+
+Closure evidence:
+
+- Candidate head: `7713d2a912aae67f01fe9d643b6475286715375b`.
+- GitHub Actions run: `34412160420` — PASS.
+- Artifact: `hero-line-wars-native-h6-v0`, ID `10127706518`, SHA-256 `8dc2bf408107c19e372a02e35b7682958f785d45664c1609b293cedb2493f988`.
+- H1 through H5 regressions remained PASS in the same OpenRealm Wasm artifact.
+- Actor 1 used exactly the same actor-indexed public movement, basic-attack, PHASE LANCE and creep-send commands as actor 0: `HLW_BrowserHeroMove`, `HLW_BrowserHeroAttack`, `HLW_BrowserHeroAbility`, and `TW_BrowserSend`.
+- Explicit raw match/session/native combat mutation exports were absent from JS, and no suspicious bot-named HP/position/gold/income/XP/lives mutation export was present.
+- Invalid bot commands (cross-lane move, no-target attack/ability, invalid-seat send) all returned failure; authoritative state hash, log hash and hero position were unchanged.
+- Actor 1 moved through the shared H2 command to `(-120,140)`.
+- Actor 1 killed an incoming Swarm through the shared PHASE LANCE command and received `50` XP.
+- Actor 1 sent a Scout through the shared send command; its own gold changed by `-40` and income by `+4`.
+- Actor 1 then killed an incoming Scout through the shared basic-attack command, reaching XP `100`, level `2`, and basic damage `30`.
+- Browser replay verification passed and OpenRealm WebGL2 remained alive.
+- Hostile review of the complete H5-closure→H6 delta: `C0 / H0`; no repair or targeted re-review cycle required.
+- Carry-forward Medium: H6 proves authority parity with a scripted deterministic driver, not autonomous bot decision scheduling. H8 must provide actual deterministic bot choices for the playable local 1v1.
 
 ### H7 — REPLAY_NATIVE_CONSISTENCY_V0
 
