@@ -100,9 +100,24 @@ bool tw_match_init(tw_match_t *match,
         }
         match->players[player].gold = starting_gold;
         match->players[player].income = TW_STARTING_INCOME;
+        match->players[player].lives = TW_STARTING_LIVES;
     }
     match->next_tower_id = 1;
     match->next_creep_id = 1;
+    return true;
+}
+
+static bool candidate_preserves_active_creep_routes(const tw_match_t *match,
+                                                     uint8_t target,
+                                                     const tw_grid_t *candidate_grid) {
+    for (uint16_t i = 0; i < match->active_creep_count; ++i) {
+        const tw_creep_t *creep = &match->active_creeps[i];
+        if (creep->target != target) continue;
+        tw_path_t path;
+        if (!tw_grid_find_path_between(candidate_grid, creep->cell, candidate_grid->exit, &path)) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -116,9 +131,13 @@ static tw_apply_result_t apply_build(tw_match_t *match, const tw_action_t *actio
     if (player->tower_count >= TW_MAX_TOWERS_PER_PLAYER) return TW_APPLY_TOWER_CAPACITY;
 
     /* Validate on a complete copy first. No authoritative field changes until
-     * placement, route preservation, funds and capacity have all passed. */
+     * placement, entrance routing, active-creep routing, funds and capacity
+     * have all passed. */
     tw_grid_t candidate_grid = player->grid;
     if (!tw_grid_try_place(&candidate_grid, action->data.build.cell, NULL)) {
+        return TW_APPLY_ILLEGAL_PLACEMENT;
+    }
+    if (!candidate_preserves_active_creep_routes(match, action->actor, &candidate_grid)) {
         return TW_APPLY_ILLEGAL_PLACEMENT;
     }
 
@@ -145,7 +164,9 @@ static tw_apply_result_t apply_send(tw_match_t *match, const tw_action_t *action
     const tw_creep_def_t *def = tw_creep_def(action->data.send.creep);
     if (!def) return TW_APPLY_INVALID_CREEP;
     if (sender->gold < def->cost) return TW_APPLY_INSUFFICIENT_GOLD;
-    if (match->pending_send_count >= TW_MAX_PENDING_SENDS) return TW_APPLY_SEND_CAPACITY;
+    if ((uint32_t)match->pending_send_count + match->active_creep_count >= TW_MAX_CREEPS) {
+        return TW_APPLY_SEND_CAPACITY;
+    }
     if (sender->income > UINT32_MAX - def->income_gain) return TW_APPLY_ECONOMY_OVERFLOW;
 
     const uint16_t slot = match->pending_send_count;
@@ -180,26 +201,139 @@ tw_apply_result_t tw_match_apply_action(tw_match_t *match, const tw_action_t *ac
     }
 }
 
-bool tw_match_advance_income(tw_match_t *match, uint32_t ticks) {
-    if (!match) return false;
-    if (UINT64_MAX - match->tick < ticks) return false;
-
-    const uint64_t old_period = match->tick / TW_INCOME_PERIOD_TICKS;
-    const uint64_t new_tick = match->tick + ticks;
-    const uint64_t new_period = new_tick / TW_INCOME_PERIOD_TICKS;
-    const uint64_t periods = new_period - old_period;
-    uint64_t payouts[TW_PLAYER_COUNT] = {0};
-
-    for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
-        payouts[p] = (uint64_t)match->players[p].income * periods;
-        if (payouts[p] > UINT32_MAX - match->players[p].gold) return false;
+static bool spawn_pending_sends(tw_match_t *match) {
+    if ((uint32_t)match->active_creep_count + match->pending_send_count > TW_MAX_CREEPS) {
+        return false;
     }
 
-    match->tick = new_tick;
+    /* Preflight every queued send before changing either queue/count. */
+    for (uint16_t i = 0; i < match->pending_send_count; ++i) {
+        const tw_pending_send_t *send = &match->pending_sends[i];
+        if (!valid_actor(send->sender) || !valid_actor(send->target) || !valid_creep(send->kind)) {
+            return false;
+        }
+        tw_path_t path;
+        if (!tw_grid_find_path(&match->players[send->target].grid, &path)) return false;
+    }
+
+    const uint16_t base = match->active_creep_count;
+    for (uint16_t i = 0; i < match->pending_send_count; ++i) {
+        const tw_pending_send_t *send = &match->pending_sends[i];
+        const tw_creep_def_t *def = tw_creep_def(send->kind);
+        if (!def) return false;
+        match->active_creeps[base + i] = (tw_creep_t){
+            .id = send->id,
+            .sender = send->sender,
+            .target = send->target,
+            .kind = send->kind,
+            .hit_points = def->hit_points,
+            .cell = match->players[send->target].grid.entrance,
+            .progress_milli = 0,
+        };
+    }
+    match->active_creep_count = (uint16_t)(base + match->pending_send_count);
+    match->pending_send_count = 0;
+    return true;
+}
+
+static void remove_active_creep(tw_match_t *match, uint16_t index) {
+    if (index >= match->active_creep_count) return;
+    const uint16_t remaining = (uint16_t)(match->active_creep_count - index - 1);
+    if (remaining) {
+        memmove(&match->active_creeps[index],
+                &match->active_creeps[index + 1],
+                (size_t)remaining * sizeof(match->active_creeps[0]));
+    }
+    match->active_creep_count--;
+    memset(&match->active_creeps[match->active_creep_count], 0, sizeof(match->active_creeps[0]));
+}
+
+static bool leak_creep(tw_match_t *match, uint16_t index) {
+    if (index >= match->active_creep_count) return false;
+    const tw_creep_t *creep = &match->active_creeps[index];
+    if (!valid_actor(creep->target) || !valid_creep(creep->kind)) return false;
+    const tw_creep_def_t *def = tw_creep_def(creep->kind);
+    if (!def) return false;
+
+    tw_player_state_t *target = &match->players[creep->target];
+    if (def->leak_damage >= target->lives) target->lives = 0;
+    else target->lives = (uint16_t)(target->lives - def->leak_damage);
+    remove_active_creep(match, index);
+    return true;
+}
+
+static bool pay_income_if_due(tw_match_t *match) {
+    if (match->tick % TW_INCOME_PERIOD_TICKS != 0) return true;
+
     for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
-        match->players[p].gold += (uint32_t)payouts[p];
+        if (match->players[p].gold > UINT32_MAX - match->players[p].income) return false;
+    }
+    for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
+        match->players[p].gold += match->players[p].income;
     }
     return true;
+}
+
+static bool move_creeps_one_tick(tw_match_t *match) {
+    uint16_t i = 0;
+    while (i < match->active_creep_count) {
+        tw_creep_t *creep = &match->active_creeps[i];
+        if (!valid_actor(creep->target) || !valid_creep(creep->kind)) return false;
+        const tw_creep_def_t *def = tw_creep_def(creep->kind);
+        if (!def) return false;
+
+        creep->progress_milli = (uint16_t)(creep->progress_milli + def->speed_milli_cells_per_tick);
+        bool removed = false;
+        while (creep->progress_milli >= 1000) {
+            const tw_grid_t *grid = &match->players[creep->target].grid;
+            tw_path_t path;
+            if (!tw_grid_find_path_between(grid, creep->cell, grid->exit, &path) || path.length == 0) {
+                return false;
+            }
+
+            if (path.length == 1) {
+                if (!leak_creep(match, i)) return false;
+                removed = true;
+                break;
+            }
+
+            creep->cell = path.cells[1];
+            creep->progress_milli = (uint16_t)(creep->progress_milli - 1000);
+            if (creep->cell.x == grid->exit.x && creep->cell.y == grid->exit.y) {
+                if (!leak_creep(match, i)) return false;
+                removed = true;
+                break;
+            }
+        }
+        if (!removed) ++i;
+    }
+    return true;
+}
+
+static bool step_in_place(tw_match_t *match, uint32_t ticks) {
+    for (uint32_t n = 0; n < ticks; ++n) {
+        if (!spawn_pending_sends(match)) return false;
+        if (match->tick == UINT64_MAX) return false;
+        match->tick++;
+        if (!pay_income_if_due(match)) return false;
+        if (!move_creeps_one_tick(match)) return false;
+    }
+    return true;
+}
+
+bool tw_match_step(tw_match_t *match, uint32_t ticks) {
+    if (!match) return false;
+
+    /* Whole-call transactional stepping: malformed state or economy overflow
+     * cannot leave a partially advanced authoritative simulation behind. */
+    tw_match_t candidate = *match;
+    if (!step_in_place(&candidate, ticks)) return false;
+    *match = candidate;
+    return true;
+}
+
+bool tw_match_advance_income(tw_match_t *match, uint32_t ticks) {
+    return tw_match_step(match, ticks);
 }
 
 bool tw_bot_choose_build(const tw_match_t *match, uint8_t actor, tw_action_t *action_out) {
@@ -216,18 +350,17 @@ bool tw_bot_choose_build(const tw_match_t *match, uint8_t actor, tw_action_t *ac
      * tw_match_apply_action(). */
     for (uint8_t y = 0; y < player->grid.height; ++y) {
         for (uint8_t x = 0; x < player->grid.width; ++x) {
-            tw_grid_t candidate = player->grid;
-            const tw_cell_t cell = {x, y};
-            if (!tw_grid_try_place(&candidate, cell, NULL)) continue;
-
-            *action_out = (tw_action_t){
+            tw_match_t candidate_match = *match;
+            tw_action_t candidate_action = {
                 .actor = actor,
                 .kind = TW_ACTION_BUILD,
                 .data.build = {
                     .tower = TW_TOWER_NEEDLE,
-                    .cell = cell,
+                    .cell = {x, y},
                 },
             };
+            if (tw_match_apply_action(&candidate_match, &candidate_action) != TW_APPLY_OK) continue;
+            *action_out = candidate_action;
             return true;
         }
     }
@@ -261,11 +394,13 @@ uint64_t tw_match_hash(const tw_match_t *match) {
     hash = hash_u32(hash, match->next_creep_id);
     hash = hash_u64(hash, match->tick);
     hash = hash_u32(hash, match->pending_send_count);
+    hash = hash_u32(hash, match->active_creep_count);
 
     for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
         const tw_player_state_t *player = &match->players[p];
         hash = hash_u32(hash, player->gold);
         hash = hash_u32(hash, player->income);
+        hash = hash_u32(hash, player->lives);
         hash = hash_u64(hash, tw_grid_hash(&player->grid));
         hash = hash_u32(hash, player->tower_count);
         for (uint16_t i = 0; i < player->tower_count; ++i) {
@@ -284,6 +419,18 @@ uint64_t tw_match_hash(const tw_match_t *match) {
         hash = hash_byte(hash, send->sender);
         hash = hash_byte(hash, send->target);
         hash = hash_u32(hash, (uint32_t)send->kind);
+    }
+
+    for (uint16_t i = 0; i < match->active_creep_count; ++i) {
+        const tw_creep_t *creep = &match->active_creeps[i];
+        hash = hash_u32(hash, creep->id);
+        hash = hash_byte(hash, creep->sender);
+        hash = hash_byte(hash, creep->target);
+        hash = hash_u32(hash, (uint32_t)creep->kind);
+        hash = hash_u32(hash, creep->hit_points);
+        hash = hash_byte(hash, creep->cell.x);
+        hash = hash_byte(hash, creep->cell.y);
+        hash = hash_u32(hash, creep->progress_milli);
     }
     return hash;
 }
