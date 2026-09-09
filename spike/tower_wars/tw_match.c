@@ -130,9 +130,6 @@ static tw_apply_result_t apply_build(tw_match_t *match, const tw_action_t *actio
     if (player->gold < def->cost) return TW_APPLY_INSUFFICIENT_GOLD;
     if (player->tower_count >= TW_MAX_TOWERS_PER_PLAYER) return TW_APPLY_TOWER_CAPACITY;
 
-    /* Validate on a complete copy first. No authoritative field changes until
-     * placement, entrance routing, active-creep routing, funds and capacity
-     * have all passed. */
     tw_grid_t candidate_grid = player->grid;
     if (!tw_grid_try_place(&candidate_grid, action->data.build.cell, NULL)) {
         return TW_APPLY_ILLEGAL_PLACEMENT;
@@ -151,6 +148,7 @@ static tw_apply_result_t apply_build(tw_match_t *match, const tw_action_t *actio
         .owner = action->actor,
         .kind = action->data.build.tower,
         .cell = action->data.build.cell,
+        .cooldown_ticks = 0,
     };
     player->tower_count = (uint16_t)(slot + 1);
     match->next_tower_id = tower_id + 1;
@@ -206,7 +204,6 @@ static bool spawn_pending_sends(tw_match_t *match) {
         return false;
     }
 
-    /* Preflight every queued send before changing either queue/count. */
     for (uint16_t i = 0; i < match->pending_send_count; ++i) {
         const tw_pending_send_t *send = &match->pending_sends[i];
         if (!valid_actor(send->sender) || !valid_actor(send->target) || !valid_creep(send->kind)) {
@@ -274,6 +271,90 @@ static bool pay_income_if_due(tw_match_t *match) {
     return true;
 }
 
+static uint16_t manhattan_cells(tw_cell_t a, tw_cell_t b) {
+    const uint16_t dx = a.x > b.x ? (uint16_t)(a.x - b.x) : (uint16_t)(b.x - a.x);
+    const uint16_t dy = a.y > b.y ? (uint16_t)(a.y - b.y) : (uint16_t)(b.y - a.y);
+    return (uint16_t)(dx + dy);
+}
+
+static bool creep_remaining_milli(const tw_match_t *match,
+                                  const tw_creep_t *creep,
+                                  uint32_t *remaining_out) {
+    if (!valid_actor(creep->target) || !valid_creep(creep->kind) || !remaining_out) return false;
+    const tw_grid_t *grid = &match->players[creep->target].grid;
+    tw_path_t path;
+    if (!tw_grid_find_path_between(grid, creep->cell, grid->exit, &path) || path.length == 0) {
+        return false;
+    }
+
+    const uint32_t edges = (uint32_t)(path.length - 1);
+    uint32_t remaining = edges * 1000u;
+    if (edges && creep->progress_milli < 1000) remaining -= creep->progress_milli;
+    *remaining_out = remaining;
+    return true;
+}
+
+static bool select_tower_target(const tw_match_t *match,
+                                const tw_tower_t *tower,
+                                const tw_tower_def_t *def,
+                                uint16_t *target_index_out) {
+    bool found = false;
+    uint32_t best_remaining = UINT32_MAX;
+    uint32_t best_id = UINT32_MAX;
+    uint16_t best_index = 0;
+
+    for (uint16_t i = 0; i < match->active_creep_count; ++i) {
+        const tw_creep_t *creep = &match->active_creeps[i];
+        if (creep->target != tower->owner || creep->hit_points == 0) continue;
+        if (manhattan_cells(tower->cell, creep->cell) > def->range_cells) continue;
+
+        uint32_t remaining = 0;
+        if (!creep_remaining_milli(match, creep, &remaining)) return false;
+        if (!found || remaining < best_remaining ||
+            (remaining == best_remaining && creep->id < best_id)) {
+            found = true;
+            best_remaining = remaining;
+            best_id = creep->id;
+            best_index = i;
+        }
+    }
+
+    if (!found) return true;
+    *target_index_out = best_index;
+    return true;
+}
+
+static bool run_tower_combat_one_tick(tw_match_t *match) {
+    for (uint8_t p = 0; p < TW_PLAYER_COUNT; ++p) {
+        tw_player_state_t *player = &match->players[p];
+        for (uint16_t t = 0; t < player->tower_count; ++t) {
+            tw_tower_t *tower = &player->towers[t];
+            if (tower->owner != p || !valid_tower(tower->kind)) return false;
+            const tw_tower_def_t *def = tw_tower_def(tower->kind);
+            if (!def || def->cadence_ticks == 0) return false;
+
+            if (tower->cooldown_ticks > 0) {
+                tower->cooldown_ticks--;
+                continue;
+            }
+
+            uint16_t target_index = UINT16_MAX;
+            if (!select_tower_target(match, tower, def, &target_index)) return false;
+            if (target_index == UINT16_MAX) continue;
+            if (target_index >= match->active_creep_count) return false;
+
+            tw_creep_t *creep = &match->active_creeps[target_index];
+            if (def->damage >= creep->hit_points) {
+                remove_active_creep(match, target_index);
+            } else {
+                creep->hit_points -= def->damage;
+            }
+            tower->cooldown_ticks = (uint16_t)(def->cadence_ticks - 1);
+        }
+    }
+    return true;
+}
+
 static bool move_creeps_one_tick(tw_match_t *match) {
     uint16_t i = 0;
     while (i < match->active_creep_count) {
@@ -316,6 +397,7 @@ static bool step_in_place(tw_match_t *match, uint32_t ticks) {
         if (match->tick == UINT64_MAX) return false;
         match->tick++;
         if (!pay_income_if_due(match)) return false;
+        if (!run_tower_combat_one_tick(match)) return false;
         if (!move_creeps_one_tick(match)) return false;
     }
     return true;
@@ -323,9 +405,6 @@ static bool step_in_place(tw_match_t *match, uint32_t ticks) {
 
 bool tw_match_step(tw_match_t *match, uint32_t ticks) {
     if (!match) return false;
-
-    /* Whole-call transactional stepping: malformed state or economy overflow
-     * cannot leave a partially advanced authoritative simulation behind. */
     tw_match_t candidate = *match;
     if (!step_in_place(&candidate, ticks)) return false;
     *match = candidate;
@@ -345,9 +424,6 @@ bool tw_bot_choose_build(const tw_match_t *match, uint8_t actor, tw_action_t *ac
         return false;
     }
 
-    /* Frozen V0 planner order: row-major cells, cheapest archetype first.
-     * It only proves legality on copies. Mutation still belongs exclusively to
-     * tw_match_apply_action(). */
     for (uint8_t y = 0; y < player->grid.height; ++y) {
         for (uint8_t x = 0; x < player->grid.width; ++x) {
             tw_match_t candidate_match = *match;
@@ -410,6 +486,7 @@ uint64_t tw_match_hash(const tw_match_t *match) {
             hash = hash_u32(hash, (uint32_t)tower->kind);
             hash = hash_byte(hash, tower->cell.x);
             hash = hash_byte(hash, tower->cell.y);
+            hash = hash_u32(hash, tower->cooldown_ticks);
         }
     }
 
