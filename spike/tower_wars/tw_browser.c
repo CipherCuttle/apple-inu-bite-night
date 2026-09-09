@@ -11,11 +11,28 @@
 #define TW_BROWSER_JSON_CAPACITY 32768
 #define TW_BROWSER_VISIBLE_CREEPS 64
 
+#ifdef HLW_NATIVE_V0
+/* Presentation-only OpenRealm bridge. These functions may mirror session state
+ * into native edicts, but they do not own movement, HP, rewards, leaks or any
+ * other simulation decision. tw_session remains the single authority. */
+extern int HLW_OpenRealmPresentationReset(void);
+extern int HLW_OpenRealmPresentationBegin(void);
+extern int HLW_OpenRealmPresentationSyncCreep(uint32_t id,
+                                              uint8_t target,
+                                              uint8_t kind,
+                                              uint8_t x,
+                                              uint8_t y,
+                                              uint16_t progress_milli,
+                                              uint32_t hit_points);
+extern int HLW_OpenRealmPresentationEnd(void);
+#endif
+
 static tw_session_t browser_session;
 static bool browser_initialized;
 static tw_session_result_t browser_last_session_result = TW_SESSION_MATCH_REJECTED;
 static tw_apply_result_t browser_last_match_result = TW_APPLY_INVALID_MATCH;
 static bool browser_replay_ok;
+static bool browser_native_sync_ok = true;
 static char browser_json[TW_BROWSER_JSON_CAPACITY];
 
 static size_t appendf(size_t used, const char *format, ...) {
@@ -50,10 +67,32 @@ static size_t append_path(size_t used, uint8_t player) {
     return appendf(used, "]");
 }
 
+static bool sync_native_presentation(void) {
+#ifdef HLW_NATIVE_V0
+    if (HLW_OpenRealmPresentationBegin() != 1) return false;
+    for (uint16_t i = 0; i < browser_session.match.active_creep_count; ++i) {
+        const tw_creep_t *creep = &browser_session.match.active_creeps[i];
+        if (HLW_OpenRealmPresentationSyncCreep(creep->id,
+                                              creep->target,
+                                              (uint8_t)creep->kind,
+                                              creep->cell.x,
+                                              creep->cell.y,
+                                              creep->progress_milli,
+                                              creep->hit_points) != 1) {
+            return false;
+        }
+    }
+    return HLW_OpenRealmPresentationEnd() == 1;
+#else
+    return true;
+#endif
+}
+
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserReset(void) {
     browser_last_match_result = TW_APPLY_INVALID_MATCH;
     browser_replay_ok = false;
+    browser_native_sync_ok = true;
     browser_initialized = tw_session_init(&browser_session,
                                           TW_BROWSER_WIDTH,
                                           TW_BROWSER_HEIGHT,
@@ -62,13 +101,20 @@ int TW_BrowserReset(void) {
                                           TW_BROWSER_STARTING_GOLD,
                                           TW_DEFAULT_SEED);
     browser_last_session_result = browser_initialized ? TW_SESSION_OK : TW_SESSION_MATCH_REJECTED;
+#ifdef HLW_NATIVE_V0
+    if (browser_initialized) {
+        browser_native_sync_ok = HLW_OpenRealmPresentationReset() == 1 &&
+                                 sync_native_presentation();
+    }
+#endif
     if (browser_initialized) {
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_RESET=PASS seed=%llu gold=%u path0=%u path1=%u\n",
+                "TOWER_WARS_BROWSER_RESET=PASS seed=%llu gold=%u path0=%u path1=%u native=%s\n",
                 (unsigned long long)browser_session.origin.seed,
                 (unsigned)TW_BROWSER_STARTING_GOLD,
                 (unsigned)path_length_for(0),
-                (unsigned)path_length_for(1));
+                (unsigned)path_length_for(1),
+                browser_native_sync_ok ? "PASS" : "FAIL");
     }
     return browser_initialized ? 1 : 0;
 }
@@ -122,14 +168,16 @@ int TW_BrowserStep(int ticks) {
     browser_last_session_result = tw_session_step(&browser_session, (uint32_t)ticks);
     const bool ok = browser_last_session_result == TW_SESSION_OK;
     if (ok) {
+        browser_native_sync_ok = sync_native_presentation();
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_STEP=PASS ticks=%d now=%llu active=%u lives=%u,%u events=%u\n",
+                "TOWER_WARS_BROWSER_STEP=PASS ticks=%d now=%llu active=%u lives=%u,%u events=%u native=%s\n",
                 ticks,
                 (unsigned long long)browser_session.match.tick,
                 (unsigned)browser_session.match.active_creep_count,
                 (unsigned)browser_session.match.players[0].lives,
                 (unsigned)browser_session.match.players[1].lives,
-                (unsigned)browser_session.event_count);
+                (unsigned)browser_session.event_count,
+                browser_native_sync_ok ? "PASS" : "FAIL");
     }
     return ok ? 1 : 0;
 }
@@ -161,7 +209,7 @@ const char *TW_BrowserSnapshot(void) {
                    "{\"initialized\":true,\"tick\":%llu,\"eventCount\":%u,"
                    "\"pendingCount\":%u,\"activeCount\":%u,\"terminal\":%s,"
                    "\"winner\":%u,\"loser\":%u,\"lastSessionResult\":%u,"
-                   "\"lastMatchResult\":%u,\"replayOk\":%s,"
+                   "\"lastMatchResult\":%u,\"replayOk\":%s,\"nativeSyncOk\":%s,"
                    "\"stateHash\":\"%016llx\",\"logHash\":\"%016llx\",",
                    (unsigned long long)match->tick,
                    (unsigned)browser_session.event_count,
@@ -173,6 +221,7 @@ const char *TW_BrowserSnapshot(void) {
                    (unsigned)browser_last_session_result,
                    (unsigned)browser_last_match_result,
                    browser_replay_ok ? "true" : "false",
+                   browser_native_sync_ok ? "true" : "false",
                    (unsigned long long)tw_session_state_hash(&browser_session),
                    (unsigned long long)tw_session_log_hash(&browser_session));
 
