@@ -198,19 +198,16 @@ replace(
 )
 
 # ---------------------------------------------------------------------------
-# Renderer proof: verify that the exact native edict number reaches the actual
-# R_DrawEntity call after frustum/model validation.
+# Renderer proof: hook the surviving renderer draw call itself, rather than the
+# surrounding block, because the earlier visual-smoke overlay also instruments
+# that block before this patch runs. The exact edict number must still reach the
+# real R_DrawEntity path after model/frustum validation.
 # ---------------------------------------------------------------------------
 replace(
     "renderer/r_ents.c",
-    '''        if (in_view) {
-            drawn++;
-            R_DrawEntity(ent, shad);
-        } else {
+    '''            R_DrawEntity(ent, shad);
 ''',
-    '''        if (in_view) {
-            drawn++;
-#ifdef __EMSCRIPTEN__
+    '''#ifdef __EMSCRIPTEN__
             extern BOOL HLW_OpenRealmIsPresentationEntityNumber(DWORD number);
             if (HLW_OpenRealmIsPresentationEntityNumber(ent->number)) {
                 fprintf(stderr,
@@ -222,7 +219,6 @@ replace(
             }
 #endif
             R_DrawEntity(ent, shad);
-        } else {
 ''',
 )
 
