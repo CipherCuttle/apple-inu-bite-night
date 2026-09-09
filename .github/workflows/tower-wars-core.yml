@@ -1,0 +1,26 @@
+name: tower-wars-core
+
+on:
+  push:
+    branches: [pivot/tower-wars-core-v0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-grid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile G1 grid tests
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            spike/tower_wars/tw_grid.c \
+            spike/tower_wars/test_tw_grid.c \
+            -o /tmp/tower-wars-grid-test
+
+      - name: Verify deterministic grid/path contract
+        run: /tmp/tower-wars-grid-test
