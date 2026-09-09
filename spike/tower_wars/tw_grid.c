@@ -42,7 +42,8 @@ bool tw_grid_init(tw_grid_t *grid, uint8_t width, uint8_t height,
     return true;
 }
 
-bool tw_grid_find_path(const tw_grid_t *grid, tw_path_t *path) {
+bool tw_grid_find_path_between(const tw_grid_t *grid, tw_cell_t start_cell, tw_cell_t goal_cell,
+                               tw_path_t *path) {
     uint16_t queue[TW_GRID_MAX_CELLS];
     int16_t parent[TW_GRID_MAX_CELLS];
     uint8_t visited[TW_GRID_MAX_CELLS] = {0};
@@ -51,14 +52,14 @@ bool tw_grid_find_path(const tw_grid_t *grid, tw_path_t *path) {
     const uint16_t cell_count = (uint16_t)(grid ? grid->width * grid->height : 0);
 
     if (!grid || !path || !cell_count ||
-        !tw_cell_valid(grid, grid->entrance) || !tw_cell_valid(grid, grid->exit)) {
+        !tw_cell_valid(grid, start_cell) || !tw_cell_valid(grid, goal_cell)) {
         return false;
     }
     memset(path, 0, sizeof(*path));
     memset(parent, 0xff, sizeof(parent));
 
-    const uint16_t start = tw_index(grid, grid->entrance);
-    const uint16_t goal = tw_index(grid, grid->exit);
+    const uint16_t start = tw_index(grid, start_cell);
+    const uint16_t goal = tw_index(grid, goal_cell);
     if (grid->blocked[start] || grid->blocked[goal]) return false;
 
     queue[tail++] = start;
@@ -103,6 +104,11 @@ bool tw_grid_find_path(const tw_grid_t *grid, tw_path_t *path) {
         path->cells[i] = tw_cell_from_index(grid, reverse[reverse_length - 1 - i]);
     }
     return true;
+}
+
+bool tw_grid_find_path(const tw_grid_t *grid, tw_path_t *path) {
+    if (!grid) return false;
+    return tw_grid_find_path_between(grid, grid->entrance, grid->exit, path);
 }
 
 bool tw_grid_try_place(tw_grid_t *grid, tw_cell_t cell, tw_path_t *resulting_path) {
