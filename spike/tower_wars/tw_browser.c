@@ -67,9 +67,18 @@ static size_t append_path(size_t used, uint8_t player) {
     return appendf(used, "]");
 }
 
+static bool fail_native_presentation(void) {
+#ifdef HLW_NATIVE_V0
+    /* A partial mirror is worse than no mirror: clear every presentation edict
+     * and fail closed until a fresh browser reset rebuilds from authority. */
+    (void)HLW_OpenRealmPresentationReset();
+#endif
+    return false;
+}
+
 static bool sync_native_presentation(void) {
 #ifdef HLW_NATIVE_V0
-    if (HLW_OpenRealmPresentationBegin() != 1) return false;
+    if (HLW_OpenRealmPresentationBegin() != 1) return fail_native_presentation();
     for (uint16_t i = 0; i < browser_session.match.active_creep_count; ++i) {
         const tw_creep_t *creep = &browser_session.match.active_creeps[i];
         if (HLW_OpenRealmPresentationSyncCreep(creep->id,
@@ -79,10 +88,11 @@ static bool sync_native_presentation(void) {
                                               creep->cell.y,
                                               creep->progress_milli,
                                               creep->hit_points) != 1) {
-            return false;
+            return fail_native_presentation();
         }
     }
-    return HLW_OpenRealmPresentationEnd() == 1;
+    if (HLW_OpenRealmPresentationEnd() != 1) return fail_native_presentation();
+    return true;
 #else
     return true;
 #endif
@@ -107,21 +117,23 @@ int TW_BrowserReset(void) {
                                  sync_native_presentation();
     }
 #endif
+    const bool ready = browser_initialized && browser_native_sync_ok;
     if (browser_initialized) {
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_RESET=PASS seed=%llu gold=%u path0=%u path1=%u native=%s\n",
+                "TOWER_WARS_BROWSER_RESET=%s seed=%llu gold=%u path0=%u path1=%u native=%s\n",
+                ready ? "PASS" : "FAIL",
                 (unsigned long long)browser_session.origin.seed,
                 (unsigned)TW_BROWSER_STARTING_GOLD,
                 (unsigned)path_length_for(0),
                 (unsigned)path_length_for(1),
                 browser_native_sync_ok ? "PASS" : "FAIL");
     }
-    return browser_initialized ? 1 : 0;
+    return ready ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserBuild(int actor, int tower, int x, int y) {
-    if (!browser_initialized) return 0;
+    if (!browser_initialized || !browser_native_sync_ok) return 0;
     const tw_action_t action = {
         .actor = (uint8_t)actor,
         .kind = TW_ACTION_BUILD,
@@ -144,7 +156,7 @@ int TW_BrowserBuild(int actor, int tower, int x, int y) {
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserSend(int actor, int creep) {
-    if (!browser_initialized) return 0;
+    if (!browser_initialized || !browser_native_sync_ok) return 0;
     const tw_action_t action = {
         .actor = (uint8_t)actor,
         .kind = TW_ACTION_SEND,
@@ -164,13 +176,14 @@ int TW_BrowserSend(int actor, int creep) {
 
 EMSCRIPTEN_KEEPALIVE
 int TW_BrowserStep(int ticks) {
-    if (!browser_initialized || ticks < 0) return 0;
+    if (!browser_initialized || !browser_native_sync_ok || ticks < 0) return 0;
     browser_last_session_result = tw_session_step(&browser_session, (uint32_t)ticks);
-    const bool ok = browser_last_session_result == TW_SESSION_OK;
-    if (ok) {
+    const bool session_ok = browser_last_session_result == TW_SESSION_OK;
+    if (session_ok) {
         browser_native_sync_ok = sync_native_presentation();
         fprintf(stderr,
-                "TOWER_WARS_BROWSER_STEP=PASS ticks=%d now=%llu active=%u lives=%u,%u events=%u native=%s\n",
+                "TOWER_WARS_BROWSER_STEP=%s ticks=%d now=%llu active=%u lives=%u,%u events=%u native=%s\n",
+                browser_native_sync_ok ? "PASS" : "FAIL",
                 ticks,
                 (unsigned long long)browser_session.match.tick,
                 (unsigned)browser_session.match.active_creep_count,
@@ -179,7 +192,7 @@ int TW_BrowserStep(int ticks) {
                 (unsigned)browser_session.event_count,
                 browser_native_sync_ok ? "PASS" : "FAIL");
     }
-    return ok ? 1 : 0;
+    return session_ok && browser_native_sync_ok ? 1 : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
