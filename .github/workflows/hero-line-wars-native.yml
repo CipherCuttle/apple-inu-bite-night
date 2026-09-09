@@ -1,0 +1,90 @@
+name: hero-line-wars-native
+
+on:
+  push:
+    branches: [phase-hlw/openrealm-native-v0]
+  workflow_dispatch:
+
+concurrency:
+  group: hero-line-wars-native-v0
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  h1-native-creep-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v10
+        with:
+          version: 6.0.9
+          no-cache: true
+
+      - name: Clone pinned OpenRealm
+        run: |
+          git clone https://github.com/corepunch/open-realm.git open-realm
+          git -C open-realm checkout cf12357883950c14abce8d636596952c3fc547bb
+          test "$(git -C open-realm rev-parse HEAD)" = "cf12357883950c14abce8d636596952c3fc547bb"
+
+      - name: Apply proven OpenRealm browser overlays
+        run: |
+          cd open-realm
+          python3 ../spike/wasm/patch_openrealm.py
+          python3 ../spike/wasm/patch_wasm32_save.py
+          python3 ../spike/wasm/patch_wasm_audio.py
+          python3 ../spike/wasm/patch_wasm_menu_abi.py
+          python3 ../spike/wasm/patch_wasm_init_trace.py
+          python3 ../spike/wasm/patch_wasm_map_unit_smoke.py
+          python3 ../spike/wasm/patch_wasm_smoke_map_resolve.py
+          python3 ../spike/wasm/patch_wasm_visual_smoke_fix.py
+          python3 ../spike/wasm/patch_wasm_selection_ring.py
+          python3 ../spike/tower_wars/patch_hlw_native_creep.py
+          git diff --check
+
+      - name: Inject deterministic session and preserve menu isolation
+        run: |
+          python3 spike/wasm/patch_menu_object_isolation.py
+          python3 spike/tower_wars/patch_openrealm_tower_wars_build.py
+          bash -n spike/wasm/build_openrealm_wasm.sh
+
+      - name: Compile OpenRealm plus Hero Line Wars authority
+        env:
+          TW_BROWSER_V0: "1"
+          HLW_NATIVE_V0: "1"
+        run: bash spike/wasm/build_openrealm_wasm.sh open-realm
+
+      - name: Prove session creep through native server client renderer path
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/openrealm.html >/dev/null; then break; fi
+            sleep 0.25
+          done
+
+          chrome="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [[ -z "$chrome" ]]; then
+            echo 'No Chromium-family browser found on runner' >&2
+            exit 1
+          fi
+          npm install --no-save --ignore-scripts puppeteer-core@24.16.0
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h1_native_entity_smoke.mjs
+
+      - name: Upload H1 Wasm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-line-wars-native-h1-v0
+          path: |
+            open-realm/build-wasm/openrealm.html
+            open-realm/build-wasm/openrealm.js
+            open-realm/build-wasm/openrealm.wasm
+            open-realm/build-wasm/openrealm.data
+          if-no-files-found: error
