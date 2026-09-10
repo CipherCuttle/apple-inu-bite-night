@@ -81,6 +81,7 @@
 <script>
   let selectedTower = 0
   let playTimer = null
+  let heroMode = false
   const BOT_SEND_SEQUENCE = [0, 1, 0, 2]
   const BOT_SEND_COST = [40, 60, 90, 130]
   const botState = { sendIndex: 0, lastActTick: -1, lastMoveGoal: '', actions: [] }
@@ -231,24 +232,29 @@
   function render() {
     if (!globalThis.__TW_READY) return null
     const state = snap()
-    const hero0 = heroPosition(0)
-    const hero1 = heroPosition(1)
-    byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span><span>LV <b>${state.heroLevel[0]}</b></span><span>XP <b>${state.heroXP[0]}</b></span><span>DMG <b>${state.heroBasicDamage[0]}</b></span><span>POS <b>${hero0[0]},${hero0[1]}</b></span>`
-    byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><span>LV <b>${state.heroLevel[1]}</b></span><span>XP <b>${state.heroXP[1]}</b></span><span>POS <b>${hero1[0]},${hero1[1]}</b></span><b class="enemy">BOT</b>`
+    if (heroMode) {
+      const hero0 = heroPosition(0)
+      const hero1 = heroPosition(1)
+      byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span><span>LV <b>${state.heroLevel[0]}</b></span><span>XP <b>${state.heroXP[0]}</b></span><span>DMG <b>${state.heroBasicDamage[0]}</b></span><span>POS <b>${hero0[0]},${hero0[1]}</b></span>`
+      byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><span>LV <b>${state.heroLevel[1]}</b></span><span>XP <b>${state.heroXP[1]}</b></span><span>POS <b>${hero1[0]},${hero1[1]}</b></span><b class="enemy">BOT</b>`
+    } else {
+      byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span>`
+      byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><b class="enemy">BOT</b>`
+    }
     byId('clock').textContent = `TICK ${state.tick} · LOG ${state.eventCount} · CREEPS ${state.activeCount}`
     byId('path0').textContent = `PATH ${state.players[0].pathLength}`
     byId('path1').textContent = `PATH ${state.players[1].pathLength}`
     renderGrid(0, state)
     renderGrid(1, state)
-    if (state.terminal && playTimer) stopPlay()
+    if (heroMode && state.terminal && playTimer) stopPlay()
     return state
   }
 
   function reset() {
     stopPlay()
-    resetBot()
+    if (heroMode) resetBot()
     const ok = apiCall('_TW_BrowserReset') === 1
-    setMessage(ok ? 'fresh deterministic local 1v1' : 'reset failed', ok)
+    setMessage(ok ? (heroMode ? 'fresh deterministic local 1v1' : 'fresh deterministic Tower Wars session') : 'reset failed', ok)
     return render()
   }
 
@@ -285,7 +291,7 @@
       stopPlay()
       return 0
     }
-    botAct(before)
+    if (heroMode) botAct(before)
     const stepped = apiCall('_TW_BrowserStep', 1)
     if (stepped !== 1) {
       setMessage('authoritative step failed', false)
@@ -308,7 +314,7 @@
     if (playTimer) return
     byId('play').textContent = 'Pause match'
     playTimer = setInterval(() => playTick(), 110)
-    setMessage('local 1v1 running · deterministic bot active')
+    setMessage(heroMode ? 'local 1v1 running · deterministic bot active' : 'Tower Wars core running')
   }
 
   function stopPlay() {
@@ -324,48 +330,68 @@
       ? '_HLW_BrowserNativeReplayVerify'
       : '_TW_BrowserReplayVerify'
     const ok = apiCall(exportName) === 1
-    setMessage(ok ? 'ordered authoritative + native replay verified' : 'replay divergence', ok)
+    setMessage(ok ? (heroMode ? 'ordered authoritative + native replay verified' : 'authoritative replay verified') : 'replay divergence', ok)
     render()
     return ok ? 1 : 0
   }
 
+  function replay() {
+    return nativeReplay()
+  }
+
   globalThis.__TW_BOOT = () => {
-    const required = [
-      '_TW_BrowserReset', '_TW_BrowserSnapshot', '_TW_BrowserSend', '_TW_BrowserStep',
-      '_HLW_BrowserHeroMove', '_HLW_BrowserHeroAttack', '_HLW_BrowserHeroAbility',
-      '_HLW_BrowserHeroX', '_HLW_BrowserHeroY',
+    const coreRequired = [
+      '_TW_BrowserReset', '_TW_BrowserSnapshot', '_TW_BrowserBuild', '_TW_BrowserSend',
+      '_TW_BrowserStep', '_TW_BrowserReplayVerify',
     ]
-    if (required.some((name) => typeof Module[name] !== 'function')) {
-      byId('tw-status').textContent = 'Hero Line Wars exports missing'
+    if (coreRequired.some((name) => typeof Module[name] !== 'function')) {
+      byId('tw-status').textContent = 'Tower Wars exports missing'
       byId('tw-status').className = 'bad'
       return
     }
+    const heroRequired = [
+      '_HLW_BrowserHeroMove', '_HLW_BrowserHeroAttack', '_HLW_BrowserHeroAbility',
+      '_HLW_BrowserHeroX', '_HLW_BrowserHeroY',
+    ]
+    heroMode = heroRequired.every((name) => typeof Module[name] === 'function')
     if (Module._TW_BrowserReset() !== 1) {
       byId('tw-status').textContent = 'authoritative session init failed'
       byId('tw-status').className = 'bad'
       return
     }
-    resetBot()
+    if (heroMode) resetBot()
+    else byId('bot-status').textContent = 'BOT: H8 unavailable in TW-only build'
+    document.querySelectorAll('.hero-group button').forEach((button) => { button.disabled = !heroMode })
     globalThis.__TW_READY = true
-    globalThis.__TW_API = {
+    const sharedApi = {
       snapshot: snap,
-      heroPosition,
       reset,
       build: (actor,tower,x,y) => { const result = apiCall('_TW_BrowserBuild',actor,tower,x,y); render(); return result },
       send: (actor,creep) => { const result = apiCall('_TW_BrowserSend',actor,creep); render(); return result },
       step: (ticks) => { const result = apiCall('_TW_BrowserStep',ticks); render(); return result },
-      heroMove,
-      heroAttack,
-      heroAbility,
-      botAct,
-      playTick,
-      playTicks,
-      nativeReplay,
+      replay,
       render,
-      botState,
     }
-    globalThis.__HLW_H8 = { botState }
-    byId('tw-status').textContent = 'OpenRealm WebGL2 alive · human vs deterministic bot ready'
+    if (heroMode) {
+      Object.assign(sharedApi, {
+        heroPosition,
+        heroMove,
+        heroAttack,
+        heroAbility,
+        botAct,
+        playTick,
+        playTicks,
+        nativeReplay,
+        botState,
+      })
+      globalThis.__HLW_H8 = { botState }
+    } else {
+      delete globalThis.__HLW_H8
+    }
+    globalThis.__TW_API = sharedApi
+    byId('tw-status').textContent = heroMode
+      ? 'OpenRealm WebGL2 alive · human vs deterministic bot ready'
+      : 'OpenRealm WebGL2 alive · authoritative C session ready'
     byId('tw-status').className = 'ok'
     render()
   }
@@ -379,17 +405,17 @@
     setMessage(ok ? 'creep sent to rival line' : 'send rejected', ok)
     render()
   }))
-  byId('hero-center').addEventListener('click', () => { const [x] = heroPosition(0); heroMove(x, -82) })
-  byId('hero-left').addEventListener('click', () => heroNudge(-40, 0))
-  byId('hero-right').addEventListener('click', () => heroNudge(40, 0))
-  byId('hero-up').addEventListener('click', () => heroNudge(0, 22))
-  byId('hero-down').addEventListener('click', () => heroNudge(0, -22))
-  byId('hero-attack').addEventListener('click', heroAttack)
-  byId('hero-ability').addEventListener('click', heroAbility)
+  byId('hero-center').addEventListener('click', () => { if (heroMode) { const [x] = heroPosition(0); heroMove(x, -82) } })
+  byId('hero-left').addEventListener('click', () => { if (heroMode) heroNudge(-40, 0) })
+  byId('hero-right').addEventListener('click', () => { if (heroMode) heroNudge(40, 0) })
+  byId('hero-up').addEventListener('click', () => { if (heroMode) heroNudge(0, 22) })
+  byId('hero-down').addEventListener('click', () => { if (heroMode) heroNudge(0, -22) })
+  byId('hero-attack').addEventListener('click', () => { if (heroMode) heroAttack() })
+  byId('hero-ability').addEventListener('click', () => { if (heroMode) heroAbility() })
   byId('play').addEventListener('click', () => playTimer ? stopPlay() : startPlay())
   byId('step').addEventListener('click', playTick)
   byId('step10').addEventListener('click', () => playTicks(10))
-  byId('replay').addEventListener('click', nativeReplay)
+  byId('replay').addEventListener('click', replay)
   byId('reset').addEventListener('click', reset)
 
   var Module = {
