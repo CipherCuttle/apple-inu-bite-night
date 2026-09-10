@@ -145,6 +145,7 @@ try {
   // as a fallback control and only prepares a legal native range position.
   await page.evaluate(() => globalThis.__TW_API.reset())
   await page.click('#hero-center')
+  await page.evaluate(() => document.activeElement?.blur())
   await playTick(page)
   const attackSetup = await snapshot(page)
   const scout = attackSetup.creeps.find((creep) => creep.sender === 1 && creep.target === 0 && creep.kind === 0)
@@ -168,6 +169,7 @@ try {
   // Scout for the existing 20 gold reward, and grants the frozen 50 XP.
   await page.evaluate(() => globalThis.__TW_API.reset())
   await page.click('#hero-center')
+  await page.evaluate(() => document.activeElement?.blur())
   await playTick(page)
   const abilitySetup = await snapshot(page)
   const abilityScout = abilitySetup.creeps.find((creep) => creep.sender === 1 && creep.target === 0 && creep.kind === 0)
