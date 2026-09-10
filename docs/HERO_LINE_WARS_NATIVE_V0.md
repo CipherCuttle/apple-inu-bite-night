@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS / H6 PASS / H7 PASS
+Status: PASS — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS / H6 PASS / H7 PASS / H8 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -107,7 +107,7 @@ Closure evidence:
 - OpenRealm WebGL2 remained alive through the proof.
 - Hostile review: `C0 / H0`; no repair or re-review cycle required.
 - Carry-forward Medium: native H3 range currently uses the authoritative server creep mirror's cell coordinates and does not apply `progress_milli`, so renderer interpolation can be visually finer-grained than attack-range legality.
-- Carry-forward Medium: H3 replay reproduces accepted attack effects/cadence, but native range legality is not replayed because native hero movement is not yet in the session log; H7 explicitly owns full replay/native consistency.
+- Carry-forward Medium: H3 replay reproduces accepted attack effects/cadence, but native range legality is not replayed because native hero movement is not in the session log; H7 explicitly owns full replay/native consistency.
 - Carry-forward Medium: nearest/creep-ID target ordering is deterministic in implementation, but H3 browser evidence exercises a single legal target rather than a multi-target tie case.
 
 ### H4 — HERO_ABILITY_V0 — PASS
@@ -223,11 +223,30 @@ Closure evidence:
 - The repaired route-changing state round-trips through H7 native replay exactly and OpenRealm WebGL2 remains alive.
 - Exactly one targeted re-review of the High repair: `C0 / H0`. Review budget consumed; no further review loop.
 
-### H8 — BROWSER_PLAYABLE_SLICE_V0
+### H8 — BROWSER_PLAYABLE_SLICE_V0 — PASS
 
 Chromium visibly proves a playable loop in the actual OpenRealm Wasm build: human hero moves, kills or damages an incoming native creep, earns reward/XP, performs the active ability, sends a creep to the rival lane, rival state changes, income/leak/lives remain authoritative, and OpenRealm WebGL2 stays stable.
 
-`HERO_LINE_WARS_NATIVE_V0 = PASS` requires H1–H8.
+Closure evidence:
+
+- Final validated repair head: `90e3e2fb064e89b02bf6262afc90eaeffc33cb00` on `phase-hlw/h8-browser-playable-slice-v0`.
+- Full H1→H8 GitHub Actions run: `34498411186` — PASS.
+- H8 artifact: `hero-line-wars-native-h8-v0`, ID `10160864492`, SHA-256 `1291fc66ef5c8022699037f7703a1d9bfc2bc2e5a786eaa7398e500e93670a4a`.
+- Existing TW-only compatibility run: `34498411184` — PASS.
+- TW-only artifact: `tower-wars-openrealm-wasm-v0`, ID `10160827707`, SHA-256 `1ea8b7e1dbbe9758cd0de6e91fe31cc37aca218ca9f49e80b47d2ffb52ae4883`.
+- The full H1→H8 run passed deterministic H3-H5 host authority tests, pinned OpenRealm checkout, all H1-H7 browser regressions, the H8 physical DOM interaction proof, playable local 1v1 proof and success-only Wasm artifact upload.
+- H8 browser controls enter only through the existing actor-indexed public movement/basic-attack/PHASE-LANCE/send boundaries. The deterministic bot uses actor `1` through the same public boundaries; no bot-only HP, position, gold, income, XP, lives or retirement authority was introduced.
+- The playable proof covers human native hero movement, basic damage and kill reward/XP, PHASE LANCE damage/cost, periodic income, exactly-once leak/lives loss, human send into the rival lane, autonomous deterministic bot movement/combat/send response, exact H7 native replay and stable OpenRealm WebGL2.
+- Browser presentation repair: H8 overrides only OpenRealm video policy with `vid_native=0` and `vid_fullscreen=0`, preventing the native canvas from entering the browser fullscreen top layer and removing sibling H8 controls from physical hit-testing. Simulation/game authority is unchanged.
+- Independent Codex hostile review of candidate `3daf3753b321dc3d9215a2539557709a683056db`: `C0 / H1` plus one coupled P2. High: the shared shell required `_HLW_Browser*` exports and therefore no longer booted under the existing TW-only browser build. Coupled P2: the shared shell had dropped legacy `globalThis.__TW_API.replay`, which the existing `browser_vertical_slice.mjs` still calls.
+- High/coupled repair at `5446ec423274a5216c33cc2617b11674e9c56681`: the shell now detects TW-core availability independently from optional H8 hero exports, preserves TW-only rendering/stepping, disables hero-only controls when unavailable, and exposes `__TW_API.replay` in both modes; H8 mode retains the native replay verifier and deterministic bot/hero path.
+- Exactly one targeted Codex re-review of semantic repair `5446ec423274a5216c33cc2617b11674e9c56681`: no major issues (`C0 / H0`). Review budget consumed.
+- Post-re-review validation deliberately ran the existing TW-only workflow on the H8 stacked lineage. Its first run exposed a pre-existing H7 compile-mode hygiene defect before browser execution: native-only static helper `fail_native_presentation` was visible without `HLW_NATIVE_V0` and failed `-Werror` as unused.
+- Validation-only source-hygiene repair at `90e3e2fb064e89b02bf6262afc90eaeffc33cb00`: the helper definition itself is now compiled only under the already-existing `HLW_NATIVE_V0` guard. No native-HLW runtime behavior, simulation authority or public command semantics changed.
+- Final validation then passed both the unchanged legacy TW-only Chromium vertical slice—including the restored `__TW_API.replay` contract—and the full H1→H8 native authority/browser suite on the same exact source head.
+- No second hostile re-review was opened after the validation-only compile guard because the single targeted re-review budget had already been consumed; the guard is compile-time mode hygiene only and the two exact CI modes are green.
+
+`HERO_LINE_WARS_NATIVE_V0 = PASS` requires H1–H8. H1–H8 are now PASS.
 
 ## Non-goals
 
