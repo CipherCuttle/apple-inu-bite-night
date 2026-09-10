@@ -103,7 +103,7 @@ try {
     beforeReplay.nativeCreepCount === afterReplay.nativeCreepCount
 
   const finalHero = await page.evaluate(() => [Module._HLW_BrowserHeroX(0), Module._HLW_BrowserHeroY(0)])
-  const finalRuntime = await page.evaluate(() => ({
+  const firstRuntime = await page.evaluate(() => ({
     openRealm: globalThis.__OPENREALM_SDL_WEBGL_BOOT === true,
     webgl2: Boolean(document.getElementById('canvas')?.getContext('webgl2')),
   }))
@@ -111,8 +111,75 @@ try {
   if (!exactReplay || replayed.activeCount !== 1 || !replayed.creeps[0] ||
       replayed.creeps[0].progress !== 250 || replayed.creeps[0].hp !== 20 ||
       JSON.stringify(finalHero) !== JSON.stringify([-60, -82]) ||
+      !firstRuntime.openRealm || !firstRuntime.webgl2 || abortSeen || pageError) {
+    throw new Error(`H7 partial-progress replay proof failed: ${JSON.stringify({ exactReplay, beforeReplay, afterReplay, replayed, finalHero, firstRuntime, abortSeen, pageError })}`)
+  }
+
+  // Hostile-review repair proof: an accepted build can reroute an already
+  // partially-progressed creep. Native legality must reflect the new route
+  // immediately, before any subsequent simulation step.
+  await expectOne(page, () => Module._TW_BrowserReset(), 'H7 reroute reset')
+  await expectOne(page, () => Module._HLW_BrowserHeroMove(0, -60, -82), 'H7 reroute hero move')
+  await expectOne(page, () => Module._TW_BrowserStep(16), 'H7 reroute settle hero')
+  await expectOne(page, () => Module._TW_BrowserSend(1, 0), 'H7 reroute scout send')
+  await expectOne(page, () => Module._TW_BrowserStep(1), 'H7 reroute scout spawn')
+
+  const beforeBuild = await snapshot(page)
+  const beforeBuildNative = await replaySnapshot(page)
+  if (beforeBuild.activeCount !== 1 || !beforeBuild.creeps[0] ||
+      beforeBuild.creeps[0].x !== 0 || beforeBuild.creeps[0].y !== 3 ||
+      beforeBuild.creeps[0].progress !== 250 || beforeBuild.creeps[0].hp !== 45) {
+    throw new Error(`H7 reroute setup diverged: ${JSON.stringify(beforeBuild)}`)
+  }
+
+  // Default route from (0,3) advances east, projecting x=-150 at progress 250.
+  // Blocking (1,3) is legal and forces deterministic north-first rerouting.
+  // New authoritative projection is about (-160,-87.5), putting the same hero
+  // outside basic range 96. Build must resync that projection before returning.
+  await expectOne(page, () => Module._TW_BrowserBuild(0, 0, 1, 3), 'H7 route-changing build')
+  const afterBuild = await snapshot(page)
+  const afterBuildNative = await replaySnapshot(page)
+  if (!afterBuild.nativeSyncOk || afterBuild.players[0].towerCount !== 1 ||
+      afterBuild.activeCount !== 1 || !afterBuild.creeps[0] ||
+      afterBuild.creeps[0].progress !== 250 || afterBuild.creeps[0].hp !== 45 ||
+      beforeBuildNative.nativeHash === afterBuildNative.nativeHash) {
+    throw new Error(`H7 build did not immediately resync rerouted native projection: ${JSON.stringify({ beforeBuild, beforeBuildNative, afterBuild, afterBuildNative })}`)
+  }
+
+  const rejectState = afterBuild.stateHash
+  const rejectSessionLog = afterBuildNative.sessionLogHash
+  const rejectCommandHash = afterBuildNative.commandHash
+  const rejectNativeHash = afterBuildNative.nativeHash
+  const rejectedAttack = await page.evaluate(() => Module._HLW_BrowserHeroAttack(0))
+  const afterRejectedAttack = await snapshot(page)
+  const afterRejectedNative = await replaySnapshot(page)
+  if (rejectedAttack !== 0 || afterRejectedAttack.creeps[0]?.hp !== 45 ||
+      afterRejectedAttack.heroXP[0] !== 0 || afterRejectedAttack.stateHash !== rejectState ||
+      afterRejectedNative.sessionLogHash !== rejectSessionLog ||
+      afterRejectedNative.commandHash !== rejectCommandHash ||
+      afterRejectedNative.nativeHash !== rejectNativeHash) {
+    throw new Error(`H7 post-build stale-legality rejection failed: ${JSON.stringify({ rejectedAttack, afterBuild, afterBuildNative, afterRejectedAttack, afterRejectedNative })}`)
+  }
+
+  const rerouteBeforeReplay = await replaySnapshot(page)
+  await expectOne(page, () => Module._HLW_BrowserNativeReplayVerify(), 'H7 reroute native replay')
+  const rerouteAfterReplay = await replaySnapshot(page)
+  const rerouteReplayed = await snapshot(page)
+  const rerouteReplayExact = rerouteBeforeReplay.commandCount === rerouteAfterReplay.commandCount &&
+    rerouteBeforeReplay.commandHash === rerouteAfterReplay.commandHash &&
+    rerouteBeforeReplay.stateHash === rerouteAfterReplay.stateHash &&
+    rerouteBeforeReplay.sessionLogHash === rerouteAfterReplay.sessionLogHash &&
+    rerouteBeforeReplay.nativeHash === rerouteAfterReplay.nativeHash &&
+    rerouteBeforeReplay.nativeCreepCount === rerouteAfterReplay.nativeCreepCount
+
+  const finalRuntime = await page.evaluate(() => ({
+    openRealm: globalThis.__OPENREALM_SDL_WEBGL_BOOT === true,
+    webgl2: Boolean(document.getElementById('canvas')?.getContext('webgl2')),
+  }))
+  if (!rerouteReplayExact || rerouteReplayed.creeps[0]?.progress !== 250 ||
+      rerouteReplayed.creeps[0]?.hp !== 45 || rerouteReplayed.players[0].towerCount !== 1 ||
       !finalRuntime.openRealm || !finalRuntime.webgl2 || abortSeen || pageError) {
-    throw new Error(`H7 partial-progress replay proof failed: ${JSON.stringify({ exactReplay, beforeReplay, afterReplay, replayed, finalHero, finalRuntime, abortSeen, pageError })}`)
+    throw new Error(`H7 reroute replay/stability failed: ${JSON.stringify({ rerouteReplayExact, rerouteBeforeReplay, rerouteAfterReplay, rerouteReplayed, finalRuntime, abortSeen, pageError })}`)
   }
 
   console.log(`HLW_H7_PROGRESS_EVIDENCE=${JSON.stringify({
@@ -127,6 +194,9 @@ try {
     attackAccepted: true,
     remainingHp: replayed.creeps[0].hp,
     nativeReplayExact: exactReplay,
+    routeChangingBuildResynced: beforeBuildNative.nativeHash !== afterBuildNative.nativeHash,
+    stalePostBuildAttackRejected: rejectedAttack === 0,
+    rerouteReplayExact,
     finalWebGL2: finalRuntime.webgl2,
   })}`)
   console.log('HERO_LINE_WARS_H7_PROGRESS_LEGALITY=PASS')
