@@ -2,7 +2,7 @@ name: hero-line-wars-native
 
 on:
   push:
-    branches: [phase-hlw/openrealm-native-v0, repair/h7-progress-legality-v0]
+    branches: [phase-hlw/openrealm-native-v0, repair/h7-progress-legality-v0, phase-hlw/h8-browser-playable-slice-v0]
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  h1-h7-native-authority:
+  h1-h8-native-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -89,7 +89,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 through H6 regressions and H7 native replay consistency
+      - name: Prove H1 through H7 regressions and H8 playable local 1v1
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -124,11 +124,13 @@ jobs:
             timeout 120s node spike/tower_wars/h7_progress_legality_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h7_replay_native_smoke.mjs
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/h8_browser_playable_smoke.mjs
 
-      - name: Upload H7 Wasm artifact
+      - name: Upload H8 Wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h7-v0
+          name: hero-line-wars-native-h8-v0
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
