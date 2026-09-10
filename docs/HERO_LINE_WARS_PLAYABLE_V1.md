@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_PLAYABLE_V1
 
-Status: IMPLEMENTING — P1 ACTIVE / P2-P5 INACTIVE
+Status: IMPLEMENTING — P1 GREEN CANDIDATE / AWAITING INDEPENDENT REVIEW / P2-P5 INACTIVE
 
 Parent closure: `HERO_LINE_WARS_NATIVE_V0 = PASS` at `56361b751fd6da63e63fdcaf22347b5d0ff95de6`.
 
@@ -33,7 +33,7 @@ Everything closed by `HERO_LINE_WARS_NATIVE_V0` remains frozen unless a new expl
 - The closed Phaser/dog prototype remains closed.
 - PR #6 / H8 is not merge-authorized merely because this successor exists.
 
-## P1 — MATCH_CONTROL_LOOP_V1 — ACTIVE
+## P1 — MATCH_CONTROL_LOOP_V1 — GREEN CANDIDATE / AWAITING INDEPENDENT REVIEW
 
 Goal: replace proof-oriented button stepping with a game-like continuous human control loop while keeping commands deterministic and public-boundary-only.
 
@@ -48,6 +48,22 @@ Acceptance:
 - Reset restores the frozen deterministic initial state and input scheduler state.
 - H1-H8 regressions remain green.
 - Chromium proof demonstrates physical key input → public command → authoritative/native state change while WebGL2 remains alive.
+
+Validated code candidate: `3fea105b5db21d882260aa305090a4b17d906e5b`.
+
+Validation evidence:
+
+- GitHub Actions run `34501809328` — PASS on exact candidate `3fea105b5db21d882260aa305090a4b17d906e5b`.
+- Artifact `hero-line-wars-playable-p1-v1`, ID `10162255492`, SHA-256 `0e725a8947436395d3b205cd40817258fa4edbcf88d29ea623609f67028cec92`.
+- Full inherited H1→H8 deterministic/native/browser regression chain remained green.
+- P1 Chromium proof passed sampled WASD/arrow movement, release-stop behavior, queued Space/E combat, focused-control shortcut isolation, pause stability, native replay exactness and WebGL2 survival.
+- A strengthened focus-isolation test initially failed because its own `#hero-center` click retained focus; the corrected smoke commit `3fea105b…` only blurs that fallback control before intentionally exercising global shortcuts. Runtime focus-isolation semantics remained unchanged.
+
+Review state:
+
+- Required independent hostile review has not yet closed this gate.
+- P1 remains a green candidate, not PASS, until that one review is evaluated under the bounded completion policy.
+- If the review reports Critical/High findings, repair only those findings and perform at most one targeted re-review; otherwise close P1 and move directly to P2.
 
 Non-goals for P1: rebalance, new abilities, new movement physics, camera system, art overhaul, economy changes.
 
