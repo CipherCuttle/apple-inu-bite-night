@@ -4,15 +4,21 @@ from pathlib import Path
 path = Path("spike/tower_wars/tower_wars_shell.html")
 text = path.read_text()
 
-css_old = '''    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0}
+layout_old = '''    .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
+    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0}
     .field-head{display:flex;align-items:center;justify-content:space-between}
     .human{color:var(--human)} .enemy{color:var(--enemy)}
     .grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);gap:3px;aspect-ratio:9/7;align-self:center;width:100%;max-height:100%;user-select:none}
 '''
-css_new = '''    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0;overflow:hidden}
+layout_new = '''    .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0;overflow:hidden;position:relative;z-index:1}
+    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0;overflow:hidden}
     .field-head{display:flex;align-items:center;justify-content:space-between}
     .human{color:var(--human)} .enemy{color:var(--enemy)}
     .grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);gap:3px;align-self:stretch;width:100%;height:100%;min-height:0;user-select:none}
+'''
+controls_old = '''    .controls{padding:12px;display:grid;grid-template-columns:1.45fr 1.05fr 1fr;gap:10px 14px}
+'''
+controls_new = '''    .controls{padding:12px;display:grid;grid-template-columns:1.45fr 1.05fr 1fr;gap:10px 14px;position:relative;z-index:2}
 '''
 
 incoming_old = '''      if (distance > 48) {
@@ -70,7 +76,8 @@ anchor_new = '''    const [hx, hy] = heroPosition(1)
 '''
 
 for label, old, new in (
-    ("board containment", css_old, css_new),
+    ("playfield containment", layout_old, layout_new),
+    ("control stacking", controls_old, controls_new),
     ("incoming pursuit", incoming_old, incoming_new),
     ("defensive anchor", anchor_old, anchor_new),
 ):
