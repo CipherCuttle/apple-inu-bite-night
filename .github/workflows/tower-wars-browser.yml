@@ -2,7 +2,7 @@ name: tower-wars-browser
 
 on:
   push:
-    branches: [pivot/tower-wars-core-v0]
+    branches: [pivot/tower-wars-core-v0, phase-hlw/h8-browser-playable-slice-v0]
   workflow_dispatch:
 
 concurrency:

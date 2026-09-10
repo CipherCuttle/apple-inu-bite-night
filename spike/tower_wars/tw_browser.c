@@ -85,14 +85,14 @@ static size_t append_path(size_t used, uint8_t player) {
     return appendf(used, "]");
 }
 
-static bool fail_native_presentation(void) {
 #ifdef HLW_NATIVE_V0
+static bool fail_native_presentation(void) {
     /* A partial mirror is worse than no mirror: clear every presentation edict
      * and fail closed until a fresh browser reset rebuilds from authority. */
     (void)HLW_OpenRealmPresentationReset();
-#endif
     return false;
 }
+#endif
 
 static bool sync_native_presentation(void) {
 #ifdef HLW_NATIVE_V0
