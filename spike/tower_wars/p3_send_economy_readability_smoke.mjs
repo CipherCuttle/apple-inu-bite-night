@@ -24,6 +24,14 @@ async function snapshot(page) {
   return page.evaluate(() => globalThis.__TW_API.snapshot())
 }
 
+async function pressureFacts(page) {
+  return page.evaluate(() => ({
+    active: Module._TW_BrowserOutboundCount(0),
+    queued: Module._TW_BrowserPendingSendCount(0),
+    hp: Module._TW_BrowserOutboundHitPoints(0),
+  }))
+}
+
 async function replayReceipt(page) {
   return page.evaluate(() => JSON.parse(Module.UTF8ToString(Module._HLW_BrowserReplaySnapshot())))
 }
@@ -86,6 +94,9 @@ try {
     costExport: typeof Module._TW_BrowserCreepCost === 'function',
     incomeExport: typeof Module._TW_BrowserCreepIncomeGain === 'function',
     maxCreepsExport: typeof Module._TW_BrowserMaxCreeps === 'function',
+    outboundCountExport: typeof Module._TW_BrowserOutboundCount === 'function',
+    pendingSendCountExport: typeof Module._TW_BrowserPendingSendCount === 'function',
+    outboundHpExport: typeof Module._TW_BrowserOutboundHitPoints === 'function',
     rawMatchMutation: typeof Module._tw_match_apply_action === 'function',
     rawSessionMutation: typeof Module._tw_session_apply_action === 'function',
     catalog: [...Array(Module._TW_BrowserCreepCount())].map((_, kind) => ({
@@ -97,6 +108,7 @@ try {
   }))
   if (!boot.openRealm || !boot.webgl2 || !boot.economyReadout || !boot.sendHelper ||
       !boot.creepCountExport || !boot.costExport || !boot.incomeExport || !boot.maxCreepsExport ||
+      !boot.outboundCountExport || !boot.pendingSendCountExport || !boot.outboundHpExport ||
       boot.rawMatchMutation || boot.rawSessionMutation || boot.maxCreeps !== 256 ||
       JSON.stringify(boot.catalog) !== JSON.stringify([
         { kind: 0, cost: 40, incomeGain: 4 },
@@ -110,26 +122,32 @@ try {
   await page.evaluate(() => globalThis.__TW_API.reset())
   let state = await snapshot(page)
   let ui = await economyUi(page)
+  let pressure = await pressureFacts(page)
   if (state.players[0].gold !== 500 || state.players[0].income !== 10 || state.players[0].lives !== 20 ||
+      pressure.active !== 0 || pressure.queued !== 0 || pressure.hp !== 0 ||
       !ui.own.includes('GOLD 500') || !ui.own.includes('INCOME 10') || !ui.own.includes('LIVES 20') ||
-      !ui.pressure.includes('0 ACTIVE') || !ui.pressure.includes('RIVAL LIVES 20') || ui.feedbackLive !== 'polite' ||
+      !ui.pressure.includes('0 ACTIVE') || !ui.pressure.includes('0 QUEUED') ||
+      !ui.pressure.includes('OUTBOUND HP 0') || !ui.pressure.includes('RIVAL LIVES 20') || ui.feedbackLive !== 'polite' ||
       ui.buttons.length !== 4 || ui.buttons.some((button, kind) =>
         button.cost !== boot.catalog[kind].cost || button.incomeGain !== boot.catalog[kind].incomeGain ||
         button.affordable !== 'true' || button.ready !== 'true' || button.disabled ||
         !button.text.includes(`${boot.catalog[kind].cost}G`) ||
         !button.text.includes(`+${boot.catalog[kind].incomeGain} INC`) || !button.text.includes('READY'))) {
-    throw new Error(`P3 initial economy presentation diverged: ${JSON.stringify({ state, ui })}`)
+    throw new Error(`P3 initial economy presentation diverged: ${JSON.stringify({ state, pressure, ui })}`)
   }
 
   // Physical keyboard send: Digit1 must enter the same public _TW_BrowserSend boundary.
   await page.keyboard.press('Digit1')
   state = await snapshot(page)
   ui = await economyUi(page)
+  pressure = await pressureFacts(page)
   if (state.players[0].gold !== 460 || state.players[0].income !== 14 || state.pendingCount !== 1 ||
+      pressure.active !== 0 || pressure.queued !== 1 || pressure.hp !== 0 ||
+      !ui.pressure.includes('0 ACTIVE') || !ui.pressure.includes('1 QUEUED') || !ui.pressure.includes('OUTBOUND HP 0') ||
       !ui.feedback.includes('SEND ACCEPTED · Scout · -40G · +4 INC') ||
       !ui.message.includes('keyboard send accepted · Scout') ||
       !consoleLines.some((line) => line.includes('TOWER_WARS_BROWSER_SEND=PASS actor=0 creep=0'))) {
-    throw new Error(`P3 keyboard send did not prove public authoritative economy transition: ${JSON.stringify({ state, ui })}`)
+    throw new Error(`P3 keyboard send did not prove public authoritative queued transition: ${JSON.stringify({ state, pressure, ui })}`)
   }
 
   if (await page.evaluate(() => globalThis.__TW_API.step(1)) !== 1) {
@@ -137,10 +155,13 @@ try {
   }
   state = await snapshot(page)
   ui = await economyUi(page)
+  pressure = await pressureFacts(page)
   const outboundScout = state.creeps.find((creep) => creep.sender === 0 && creep.target === 1 && creep.kind === 0)
-  if (!outboundScout || outboundScout.hp !== 45 || !ui.pressure.includes('1 ACTIVE') ||
+  if (!outboundScout || outboundScout.hp !== 45 ||
+      pressure.active !== 1 || pressure.queued !== 0 || pressure.hp !== 45 ||
+      !ui.pressure.includes('1 ACTIVE') || !ui.pressure.includes('0 QUEUED') ||
       !ui.pressure.includes('OUTBOUND HP 45') || !ui.pressure.includes('RIVAL LIVES 20')) {
-    throw new Error(`P3 rival pressure did not derive from authoritative active creep state: ${JSON.stringify({ state, ui })}`)
+    throw new Error(`P3 rival pressure did not derive from full authoritative active state: ${JSON.stringify({ state, pressure, ui })}`)
   }
 
   // Physical pointer sends use the same helper/public command and their displayed
@@ -148,39 +169,48 @@ try {
   await page.click('[data-send="3"]')
   state = await snapshot(page)
   ui = await economyUi(page)
+  pressure = await pressureFacts(page)
   if (state.players[0].gold !== 330 || state.players[0].income !== 27 ||
+      pressure.active !== 1 || pressure.queued !== 1 || pressure.hp !== 45 ||
+      !ui.pressure.includes('1 ACTIVE') || !ui.pressure.includes('1 QUEUED') ||
       !ui.feedback.includes('SEND ACCEPTED · Siege · -130G · +13 INC') ||
       !ui.message.includes('pointer send accepted · Siege') ||
       !consoleLines.some((line) => line.includes('TOWER_WARS_BROWSER_SEND=PASS actor=0 creep=3'))) {
-    throw new Error(`P3 pointer send did not prove public authoritative economy transition: ${JSON.stringify({ state, ui })}`)
+    throw new Error(`P3 pointer send did not prove public authoritative queued economy transition: ${JSON.stringify({ state, pressure, ui })}`)
   }
 
   await page.click('[data-send="3"]')
   await page.click('[data-send="3"]')
   state = await snapshot(page)
   ui = await economyUi(page)
+  pressure = await pressureFacts(page)
   const siegeButton = ui.buttons.find((button) => button.kind === 3)
-  if (state.players[0].gold !== 70 || state.players[0].income !== 53 || !siegeButton ||
+  if (state.players[0].gold !== 70 || state.players[0].income !== 53 || pressure.queued !== 3 || !siegeButton ||
       siegeButton.affordable !== 'false' || siegeButton.ready !== 'false' || siegeButton.disabled ||
       !siegeButton.text.includes('130G') || !siegeButton.text.includes('+13 INC') ||
       !siegeButton.text.includes('NEED 60G')) {
-    throw new Error(`P3 unaffordable readiness did not derive from authoritative gold: ${JSON.stringify({ state, ui })}`)
+    throw new Error(`P3 unaffordable readiness did not derive from authoritative gold: ${JSON.stringify({ state, pressure, ui })}`)
   }
 
   // Readiness is advisory presentation only: the control remains physically callable,
   // and the authoritative public command must reject without mutating economy/log state.
   const beforeReject = state
+  const pressureBeforeReject = pressure
   await page.click('[data-send="3"]')
   const afterReject = await snapshot(page)
+  const pressureAfterReject = await pressureFacts(page)
   ui = await economyUi(page)
   if (afterReject.players[0].gold !== beforeReject.players[0].gold ||
       afterReject.players[0].income !== beforeReject.players[0].income ||
       afterReject.pendingCount !== beforeReject.pendingCount || afterReject.eventCount !== beforeReject.eventCount ||
       afterReject.stateHash !== beforeReject.stateHash || afterReject.logHash !== beforeReject.logHash ||
+      pressureAfterReject.active !== pressureBeforeReject.active ||
+      pressureAfterReject.queued !== pressureBeforeReject.queued ||
+      pressureAfterReject.hp !== pressureBeforeReject.hp ||
       afterReject.lastMatchResult !== 7 || !ui.feedback.includes('SEND REJECTED · Siege · AUTHORITATIVE') ||
       !ui.message.includes('pointer send rejected · Siege') ||
       !consoleLines.some((line) => line.includes('TOWER_WARS_BROWSER_SEND=REJECT actor=0 creep=3'))) {
-    throw new Error(`P3 authoritative rejection/fail-closed proof diverged: ${JSON.stringify({ beforeReject, afterReject, ui })}`)
+    throw new Error(`P3 authoritative rejection/fail-closed proof diverged: ${JSON.stringify({ beforeReject, afterReject, pressureBeforeReject, pressureAfterReject, ui })}`)
   }
 
   const receiptBefore = await replayReceipt(page)
@@ -197,14 +227,18 @@ try {
     webgl2: Boolean(document.getElementById('canvas')?.getContext('webgl2')),
     economyText: document.getElementById('economy-readout')?.textContent ?? '',
   }))
-  if (!final.openRealm || !final.webgl2 || !final.economyText.includes('GOLD 70') || abortSeen || pageError) {
+  if (!final.openRealm || !final.webgl2 || !final.economyText.includes('GOLD 70') ||
+      !final.economyText.includes('1 ACTIVE') || !final.economyText.includes('3 QUEUED') ||
+      abortSeen || pageError) {
     throw new Error(`P3 final UI/WebGL proof failed: ${JSON.stringify({ final, abortSeen, pageError })}`)
   }
 
   console.log(`HLW_P3_EVIDENCE=${JSON.stringify({
     catalog: boot.catalog,
     keyboardScout: { gold: 460, income: 14 },
-    rivalPressure: '1 ACTIVE / 45 HP',
+    queuedPressure: '0 ACTIVE / 1 QUEUED / 0 HP',
+    activePressure: '1 ACTIVE / 0 QUEUED / 45 HP',
+    mixedPressure: '1 ACTIVE / 3 QUEUED / 45 HP',
     unaffordableSiege: { gold: 70, need: 60, disabled: false },
     rejectionFailClosed: true,
     replayExact: receiptsEqual(receiptBefore, receiptAfter),
