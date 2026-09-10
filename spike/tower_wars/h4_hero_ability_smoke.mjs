@@ -130,6 +130,12 @@ try {
     throw new Error('cooldown rejection mutated H4 authority')
   }
 
+  /* H7 makes range legality progress-aware. Keep the original H4 tick-13
+   * cooldown proof, but use the already-public hero move boundary so the
+   * second cast remains genuinely in range as the Swarm advances. */
+  if (await page.evaluate(() => Module._HLW_BrowserHeroMove(0, -60, -82)) !== 1) {
+    throw new Error('failed to issue H4 progress-aware pursuit move')
+  }
   if (await page.evaluate(() => Module._TW_BrowserStep(12)) !== 1) {
     throw new Error('failed to advance Phase Lance cooldown')
   }
