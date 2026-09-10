@@ -2,7 +2,7 @@ name: hero-line-wars-native
 
 on:
   push:
-    branches: [phase-hlw/openrealm-native-v0, repair/h7-progress-legality-v0, phase-hlw/h8-browser-playable-slice-v0]
+    branches: [phase-hlw/openrealm-native-v0, repair/h7-progress-legality-v0, phase-hlw/h8-browser-playable-slice-v0, phase-hlw/playable-v1]
   workflow_dispatch:
 
 concurrency:
@@ -73,11 +73,15 @@ jobs:
           python3 ../spike/tower_wars/patch_hlw_h7_progress_native.py
           git diff --check
 
-      - name: Inject deterministic session, H7 journal and preserve menu isolation
+      - name: Inject deterministic session and Playable V1 P1 P2 P3 P4 overlays
         run: |
           python3 spike/tower_wars/patch_hlw_h7_progress_browser.py
           python3 spike/tower_wars/patch_hlw_h7_command_journal.py
           python3 spike/tower_wars/patch_hlw_h8_bot_scheduler.py
+          python3 spike/tower_wars/patch_hlw_p1_controls.py
+          python3 spike/tower_wars/patch_hlw_p2_combat_readability.py
+          python3 spike/tower_wars/patch_hlw_p3_send_economy_readability.py
+          python3 spike/tower_wars/patch_hlw_p4_match_lifecycle.py
           git diff --check
           python3 spike/wasm/patch_menu_object_isolation.py
           python3 spike/tower_wars/patch_openrealm_tower_wars_build.py
@@ -90,7 +94,7 @@ jobs:
           HLW_HERO_V0: "1"
         run: bash spike/wasm/build_openrealm_wasm.sh open-realm
 
-      - name: Prove H1 through H7 regressions and H8 playable local 1v1
+      - name: Prove H1 through H8 regressions and Playable V1 P1 P2 P3 P4
         run: |
           set -euo pipefail
           python3 -m http.server 8765 --directory open-realm/build-wasm >/tmp/hlw-http.log 2>&1 &
@@ -131,23 +135,55 @@ jobs:
             timeout 120s node spike/tower_wars/h8_browser_playable_smoke.mjs 2>&1 | tee h8-browser.log
           h8_status=${PIPESTATUS[0]}
           set -e
-          exit "$h8_status"
+          if [[ "$h8_status" -ne 0 ]]; then exit "$h8_status"; fi
 
-      - name: Upload H8 browser failure trace
+          set +e
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/p1_match_control_smoke.mjs 2>&1 | tee p1-browser.log
+          p1_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$p1_status" -ne 0 ]]; then exit "$p1_status"; fi
+
+          set +e
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/p2_combat_readability_smoke.mjs 2>&1 | tee p2-browser.log
+          p2_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$p2_status" -ne 0 ]]; then exit "$p2_status"; fi
+
+          set +e
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/p3_send_economy_readability_smoke.mjs 2>&1 | tee p3-browser.log
+          p3_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$p3_status" -ne 0 ]]; then exit "$p3_status"; fi
+
+          set +e
+          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
+            timeout 120s node spike/tower_wars/p4_match_lifecycle_smoke.mjs 2>&1 | tee p4-browser.log
+          p4_status=${PIPESTATUS[0]}
+          set -e
+          exit "$p4_status"
+
+      - name: Upload P4 browser failure trace
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-h8-browser-trace
+          name: hero-line-wars-playable-p4-browser-trace
           path: |
             h8-browser.log
+            p1-browser.log
+            p2-browser.log
+            p3-browser.log
+            p4-browser.log
             /tmp/hlw-http.log
           if-no-files-found: warn
 
-      - name: Upload H8 Wasm diagnostic bundle
+      - name: Upload P4 Wasm diagnostic bundle
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h8-diagnostic
+          name: hero-line-wars-playable-p4-diagnostic
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
@@ -155,11 +191,11 @@ jobs:
             open-realm/build-wasm/openrealm.data
           if-no-files-found: warn
 
-      - name: Upload H8 Wasm artifact
+      - name: Upload P4 Wasm artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: hero-line-wars-native-h8-v0
+          name: hero-line-wars-playable-p4-v1
           path: |
             open-realm/build-wasm/openrealm.html
             open-realm/build-wasm/openrealm.js
