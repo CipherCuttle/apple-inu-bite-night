@@ -1,40 +1,37 @@
-# Apple Inu: Bite Night
+# Hero Line Wars on OpenRealm
 
-Top-down deterministic survival combat prototype: Apple Inu moves, an oversized sword auto-slashes from the mouth, zombies converge, and the bare combat loop must become fun before progression or Telegram systems are authorized.
+This repository is now building an original deterministic Hero Line Wars / Line Tower Wars-style browser game on a pinned WebAssembly port of OpenRealm.
 
-## Phase
-**Phase 1 — Combat Toy**
+The old Apple Inu Phaser survival prototype is closed and is not current implementation authority.
 
-## Stack
-- Phaser 3.90
-- Vite 8
-- TypeScript
-- Vitest
-- oxlint
+## Current phase
 
-## Run
-```bash
-corepack enable
-pnpm install
-pnpm dev
-```
+**HERO_LINE_WARS_PLAYABLE_V1 — P1 MATCH_CONTROL_LOOP_V1**
 
-## Verify
-```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm test:determinism
-```
+Authority contract: `docs/HERO_LINE_WARS_PLAYABLE_V1.md`
 
-## Controls
-- WASD — move / face
-- sword — automatic
-- R — restart
+Closed predecessor: `docs/HERO_LINE_WARS_NATIVE_V0.md` — H1 through H8 PASS.
 
-## Current art
-Programmer art is deliberate in Phase 1. Third-party asset packs are catalogued but not imported yet; see `licenses/ASSET_MANIFEST.json` and `docs/ASSET_PIPELINE.md`.
+## Core loop
 
-## Architecture invariant
-Simulation is fixed-tick and seeded. Rendering/gore is presentation-only. That boundary is intended to support deterministic daily runs, replays, ghosts, and later score verification without making those systems Phase 1 dependencies.
+`move hero → defend lane → attack/cast → earn gold + XP → send pressure → gain income → survive leaks → reach terminal result`
+
+## Architecture invariants
+
+- `tw_session_*` is the authoritative deterministic economy/send/combat/outcome/replay boundary.
+- OpenRealm native entities provide the proven hero/native presentation path without becoming a second simulation authority.
+- Human and deterministic bot use the same actor-indexed public movement, attack, PHASE LANCE and send boundaries.
+- Browser UI may schedule commands and display authoritative state; it may not manufacture damage, HP, rewards, XP, cooldowns, costs, income, lives, leaks, retirement or terminal outcomes.
+- Same seed + same accepted ordered command log must replay exactly.
+- No Blizzard retail content.
+
+## Engine / browser toolchain
+
+- OpenRealm pinned commit: `cf12357883950c14abce8d636596952c3fc547bb`
+- Emscripten: `6.0.9`
+- Browser proof: Chromium / Puppeteer
+- Renderer: SDL2 + WebGL2 / OpenGL ES 3
+
+## Governance
+
+Use `PLAN → CHANGESET → VERIFY → VERDICT` and the bounded completion policy recorded in the active phase contract. Do not reopen closed H1-H8 work unless a frozen invariant is falsified. Do not merge without explicit merge authority.
