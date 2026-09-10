@@ -125,8 +125,23 @@ jobs:
             timeout 120s node spike/tower_wars/h7_progress_legality_smoke.mjs
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h7_replay_native_smoke.mjs
+
+          set +e
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
-            timeout 120s node spike/tower_wars/h8_browser_playable_smoke.mjs
+            timeout 120s node spike/tower_wars/h8_browser_playable_smoke.mjs 2>&1 | tee h8-browser.log
+          h8_status=${PIPESTATUS[0]}
+          set -e
+          exit "$h8_status"
+
+      - name: Upload H8 browser failure trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-line-wars-h8-browser-trace
+          path: |
+            h8-browser.log
+            /tmp/hlw-http.log
+          if-no-files-found: warn
 
       - name: Upload H8 Wasm artifact
         uses: actions/upload-artifact@v4
