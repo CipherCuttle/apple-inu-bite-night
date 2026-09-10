@@ -126,9 +126,6 @@ jobs:
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h7_replay_native_smoke.mjs
 
-          CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
-            timeout 120s node spike/tower_wars/h8_hit_test_diagnostic.mjs 2>&1 | tee h8-hit-test.log
-
           set +e
           CHROME="$chrome" OPENREALM_URL=http://127.0.0.1:8765/openrealm.html \
             timeout 120s node spike/tower_wars/h8_browser_playable_smoke.mjs 2>&1 | tee h8-browser.log
@@ -142,7 +139,6 @@ jobs:
         with:
           name: hero-line-wars-h8-browser-trace
           path: |
-            h8-hit-test.log
             h8-browser.log
             /tmp/hlw-http.log
           if-no-files-found: warn
