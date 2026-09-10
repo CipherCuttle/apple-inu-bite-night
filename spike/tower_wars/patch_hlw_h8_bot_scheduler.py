@@ -4,6 +4,17 @@ from pathlib import Path
 path = Path("spike/tower_wars/tower_wars_shell.html")
 text = path.read_text()
 
+css_old = '''    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0}
+    .field-head{display:flex;align-items:center;justify-content:space-between}
+    .human{color:var(--human)} .enemy{color:var(--enemy)}
+    .grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);gap:3px;aspect-ratio:9/7;align-self:center;width:100%;max-height:100%;user-select:none}
+'''
+css_new = '''    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0;overflow:hidden}
+    .field-head{display:flex;align-items:center;justify-content:space-between}
+    .human{color:var(--human)} .enemy{color:var(--enemy)}
+    .grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);gap:3px;align-self:stretch;width:100%;height:100%;min-height:0;user-select:none}
+'''
+
 incoming_old = '''      if (distance > 48) {
         const goalX = clamp(tx, -160, 160)
         const goalY = clamp(ty, 24, 160)
@@ -59,6 +70,7 @@ anchor_new = '''    const [hx, hy] = heroPosition(1)
 '''
 
 for label, old, new in (
+    ("board containment", css_old, css_new),
     ("incoming pursuit", incoming_old, incoming_new),
     ("defensive anchor", anchor_old, anchor_new),
 ):
@@ -68,4 +80,4 @@ for label, old, new in (
     text = text.replace(old, new, 1)
 
 path.write_text(text)
-print("Hero Line Wars H8 deterministic bot scheduler repair applied")
+print("Hero Line Wars H8 playable shell repair applied")
