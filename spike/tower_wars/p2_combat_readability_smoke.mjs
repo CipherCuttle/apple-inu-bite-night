@@ -123,8 +123,35 @@ try {
     throw new Error(`P2 first-hit presentation diverged: ${JSON.stringify({ afterFirstHit, ui })}`)
   }
 
+  // Codex High regression: advancing an idle combat tick may update other readouts,
+  // but must not rewrite the aria-live combat feed when no new combat event exists.
+  const idleFeed = await page.evaluate(async () => {
+    const feed = document.getElementById('combat-feed')
+    if (!feed) throw new Error('P2 combat feed missing')
+    const beforeText = feed.textContent
+    const beforeNode = feed.firstChild
+    let mutationCount = 0
+    const observer = new MutationObserver((records) => {
+      mutationCount += records.filter((record) => record.type === 'childList' || record.type === 'characterData').length
+    })
+    observer.observe(feed, { childList: true, subtree: true, characterData: true })
+    const stepResult = globalThis.__TW_API.step(1)
+    await Promise.resolve()
+    observer.disconnect()
+    return {
+      stepResult,
+      mutationCount,
+      sameFirstNode: feed.firstChild === beforeNode,
+      sameText: feed.textContent === beforeText,
+    }
+  })
+  if (idleFeed.stepResult !== 1 || idleFeed.mutationCount !== 0 || !idleFeed.sameFirstNode || !idleFeed.sameText) {
+    throw new Error(`P2 idle live-region rewrite regression: ${JSON.stringify(idleFeed)}`)
+  }
+
   const readyTick = afterFirstHit.heroReady[0]
-  const delta = Math.max(0, readyTick - afterFirstHit.tick)
+  const afterIdleTick = await snapshot(page)
+  const delta = Math.max(0, readyTick - afterIdleTick.tick)
   if (await page.evaluate((ticks) => globalThis.__TW_API.step(ticks), delta) !== 1) {
     throw new Error('P2 failed to advance to basic readiness')
   }
@@ -190,6 +217,7 @@ try {
     firstScoutVisibleHp: '45 HP',
     damagedScoutVisibleHp: '20 HP',
     ambiguousKillFeedback: 'KILL CONFIRMED',
+    idleFeedMutations: idleFeed.mutationCount,
     firstKillXP: firstKill.heroXP[0],
     leveledXP: leveled.heroXP[0],
     leveledHero: leveled.heroLevel[0],
