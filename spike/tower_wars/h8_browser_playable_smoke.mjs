@@ -39,6 +39,31 @@ async function replayReceipt(page) {
   })
 }
 
+async function assertPhysicalClickTarget(page, selector) {
+  const hit = await page.evaluate((sel) => {
+    const element = document.querySelector(sel)
+    if (!element) return { selector: sel, missing: true }
+    const rect = element.getBoundingClientRect()
+    const x = rect.left + rect.width / 2
+    const y = rect.top + rect.height / 2
+    const top = document.elementFromPoint(x, y)
+    return {
+      selector: sel,
+      rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom },
+      center: [x, y],
+      topTag: top?.tagName ?? null,
+      topId: top?.id ?? null,
+      topClass: typeof top?.className === 'string' ? top.className : null,
+      targetOwnsPoint: top === element || Boolean(top && element.contains(top)),
+      scrollTop: document.getElementById('tw-root')?.scrollTop ?? null,
+    }
+  }, selector)
+  console.log(`H8_CLICK_TARGET=${JSON.stringify(hit)}`)
+  if (hit.missing || !hit.targetOwnsPoint) {
+    throw new Error(`H8 physical control obscured: ${JSON.stringify(hit)}`)
+  }
+}
+
 try {
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 })
@@ -93,6 +118,7 @@ try {
 
   // Basic combat through the visible control: 45 -> 20, wait exactly the frozen
   // cadence through playable ticks, then kill for the H5 combat reward + XP.
+  await assertPhysicalClickTarget(page, '#hero-attack')
   await page.click('#hero-attack')
   const damagedScout = await snapshot(page)
   if (damagedScout.creeps.find((creep) => creep.id === scout.id)?.hp !== 20 || damagedScout.heroXP[0] !== 0) {
