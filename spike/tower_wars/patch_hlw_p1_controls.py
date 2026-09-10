@@ -61,5 +61,11 @@ replace_once(
 "keyboard event boundary",
 )
 
+replace_once(
+'''  byId('play').addEventListener('click', () => playTimer ? stopPlay() : startPlay())\n''',
+'''  byId('play').addEventListener('click', () => {\n    playTimer ? stopPlay() : startPlay()\n    // Run/Pause is the one fallback control that hands focus back to the game\n    // immediately: players click it, then expect WASD/Space/E to control the match.\n    byId('play')?.blur()\n  })\n''',
+"Run/Pause focus handoff",
+)
+
 path.write_text(text)
 print("Hero Line Wars Playable V1 P1 controls overlay applied")
