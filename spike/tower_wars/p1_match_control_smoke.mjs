@@ -80,6 +80,22 @@ try {
     throw new Error(`P1 boot/authority boundary failed: ${JSON.stringify({ boot, abortSeen, pageError })}`)
   }
 
+  // Global game shortcuts must not also fire while an interactive fallback control
+  // owns keyboard focus. Space may activate the focused button through normal DOM
+  // accessibility, but it must not enqueue a second sampled basic attack.
+  await page.evaluate(() => globalThis.__TW_API.reset())
+  await page.focus('#hero-center')
+  await page.keyboard.press('Space')
+  const focusedControlInput = await page.evaluate(() => ({ ...globalThis.__HLW_P1.inputState }))
+  if (focusedControlInput.attackQueued || focusedControlInput.abilityQueued ||
+      focusedControlInput.attackCommands !== 0 || focusedControlInput.abilityCommands !== 0) {
+    throw new Error(`P1 focused control leaked into global shortcut queue: ${JSON.stringify(focusedControlInput)}`)
+  }
+  await page.evaluate(() => {
+    document.activeElement?.blur()
+    globalThis.__TW_API.reset()
+  })
+
   // Held movement is sampled exactly once per authoritative play tick. Keydown
   // alone must not move the native hero; two ticks produce exactly two native
   // 8-unit steps through the existing actor-indexed move command.
@@ -208,6 +224,7 @@ try {
   }
 
   console.log(`HLW_P1_EVIDENCE=${JSON.stringify({
+    focusedControlIsolated: !focusedControlInput.attackQueued && !focusedControlInput.abilityQueued,
     heldMovement: [initial, afterMove1, afterMove2],
     releaseStop: afterStopTick,
     queuedBasicDamage: [45, attacked.creeps.find((creep) => creep.id === scout.id)?.hp],
