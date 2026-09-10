@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_PLAYABLE_V1
 
-Status: IMPLEMENTING — P1 PASS / P2 ACTIVE / P3-P5 INACTIVE
+Status: IMPLEMENTING — P1 PASS / P2 PASS / P3 ACTIVE / P4-P5 INACTIVE
 
 Parent closure: `HERO_LINE_WARS_NATIVE_V0 = PASS` at `56361b751fd6da63e63fdcaf22347b5d0ff95de6`.
 
@@ -87,18 +87,61 @@ Result: `P1 MATCH_CONTROL_LOOP_V1 = PASS`.
 
 Non-goals for P1: rebalance, new abilities, new movement physics, camera system, art overhaul, economy changes.
 
-## P2 — COMBAT_READABILITY_V1 — ACTIVE
+## P2 — COMBAT_READABILITY_V1 — PASS
 
 Goal: make native combat state legible enough that a human can understand target pressure, attacks, ability use and progression without reading debug logs.
 
-Acceptance direction:
+Acceptance:
 
 - Current hero level/XP/basic readiness/PHASE-LANCE readiness and incoming creep HP are visibly readable from authoritative/native-derived state.
 - Accepted attack/cast/kill/level-up events produce presentation feedback derived from accepted state transitions only.
 - No UI animation or effect becomes an authority source or predicts unaccepted damage/reward.
 - Accessibility includes non-color-only status cues and reduced-motion-safe presentation.
 
-## P3 — SEND_ECONOMY_READABILITY_V1 — INACTIVE
+Implementation/authority notes:
+
+- Combat readouts derive from authoritative browser snapshots; no raw attack/ability/kill-resolver mutation surface was exposed to JS.
+- Positive authoritative XP delta is the kill-confirmation source. A creep ID is named only when exactly one observed incoming creep disappeared; ambiguous presentation deltas render generic `KILL CONFIRMED` rather than guessing a target.
+- Visible creep HP is paired with semantic labels; readiness remains derived from authoritative tick/cooldown state.
+
+Initial green candidate: `a424020fa7762e4b0ba90fab0eb0bfd9640291f0`.
+
+Initial validation:
+
+- GitHub Actions run `34511005108` — PASS on exact candidate `a424020fa7762e4b0ba90fab0eb0bfd9640291f0`.
+- Artifact `hero-line-wars-playable-p2-v1`, ID `10165881326`, SHA-256 `d83a66685ae2a4944d3214bc7c3283f9e125bba621d8e2976b09a4d3b53129ab`.
+- Deterministic H3/H4/H5 authority tests, pinned OpenRealm/Wasm compile, H1→H8 browser regressions, P1 regression and P2 Chromium proof all passed.
+- P2 proof covered visible HP, cooldown/readiness, accepted damage, conservative kill/XP/level-up feedback, reduced motion, exact replay and WebGL2 survival.
+
+Independent hostile review:
+
+- The single broad Codex review on exact candidate `a424020fa7…` found one gate-relevant High: `renderCombatFeed()` rebuilt the `role="status"` / `aria-live="polite"` region on every ~110 ms render even with no new event, which could repeatedly announce identical history to assistive technology.
+- No other Critical/High finding was reported.
+
+High repair:
+
+- `60abfc24f8c52245812f807f6560a92c3ebbfb04` revision-gates combat-feed DOM writes so no event-list change means no live-region mutation; reset deliberately advances the presentation revision once.
+- `364ae6b1ecda5c6f625f047413e3bb76001a9806` adds a MutationObserver regression proving an idle authoritative tick causes zero live-region mutations while preserving feed node identity and text, then continues the full P2 combat/replay/WebGL proof.
+
+Final validation:
+
+- GitHub Actions run `34522375093` — PASS on exact repaired runtime head `364ae6b1ecda5c6f625f047413e3bb76001a9806`.
+- Deterministic H3/H4/H5 host authority tests — PASS.
+- Pinned OpenRealm/Wasm compile — PASS.
+- Complete H1→H8 browser regression chain — PASS.
+- P1 Chromium regression — PASS.
+- Strengthened P2 Chromium proof — PASS, including `idle live-region mutations = 0`.
+- Artifact `hero-line-wars-playable-p2-v1`, ID `10170290133`, SHA-256 `aa5f53d39c64d52e441d46df032e5a104306b4371f9981d51ee877a3e30f1a96`.
+
+Targeted re-review:
+
+- Exactly one targeted Codex re-review was requested on `364ae6b1ec…`, restricted to the live-region High repair, accepted-event updates and inherited authority/replay boundaries.
+- Codex returned: `Didn't find any major issues. Nice work!` on reviewed commit `364ae6b1ec`. `C0/H0` for the targeted repair.
+- P2 review budget is consumed. No further P2 review loop is authorized.
+
+Result: `P2 COMBAT_READABILITY_V1 = PASS`.
+
+## P3 — SEND_ECONOMY_READABILITY_V1 — ACTIVE
 
 Goal: make offensive decisions understandable before committing them.
 
