@@ -77,5 +77,35 @@ replace_once(
 "presentation sync authoritative next cell",
 )
 
+replace_once(
+'''    fprintf(stderr,
+            "TOWER_WARS_BROWSER_BUILD=%s actor=%d tower=%d cell=%d,%d path=%u events=%u\\n",
+            ok ? "PASS" : "REJECT", actor, tower, x, y,
+            actor >= 0 && actor < TW_PLAYER_COUNT ? (unsigned)path_length_for((uint8_t)actor) : 0,
+            (unsigned)browser_session.event_count);
+    return ok ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int TW_BrowserSend(int actor, int creep) {
+''',
+'''    fprintf(stderr,
+            "TOWER_WARS_BROWSER_BUILD=%s actor=%d tower=%d cell=%d,%d path=%u events=%u\\n",
+            ok ? "PASS" : "REJECT", actor, tower, x, y,
+            actor >= 0 && actor < TW_PLAYER_COUNT ? (unsigned)path_length_for((uint8_t)actor) : 0,
+            (unsigned)browser_session.event_count);
+    if (ok) {
+        browser_native_sync_ok = sync_native_presentation();
+        if (!browser_native_sync_ok) return 0;
+    }
+    return ok ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int TW_BrowserSend(int actor, int creep) {
+''',
+"build route-change presentation resync",
+)
+
 path.write_text(text)
 print("Hero Line Wars H7 browser progress projection applied")
