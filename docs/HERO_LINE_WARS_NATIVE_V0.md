@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_NATIVE_V0
 
-Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS / H6 PASS
+Status: IMPLEMENTING — H1 PASS / H2 PASS / H3 PASS / H4 PASS / H5 PASS / H6 PASS / H7 PASS
 
 Parent: `pivot/tower-wars-core-v0` closure lineage through `5c778c1c7151581a5863f6c269f505b0bd41f5e6`
 
@@ -204,9 +204,24 @@ Closure evidence:
 - Hostile review of the complete H5-closure→H6 delta: `C0 / H0`; no repair or targeted re-review cycle required.
 - Carry-forward Medium: H6 proves authority parity with a scripted deterministic driver, not autonomous bot decision scheduling. H8 must provide actual deterministic bot choices for the playable local 1v1.
 
-### H7 — REPLAY_NATIVE_CONSISTENCY_V0
+### H7 — REPLAY_NATIVE_CONSISTENCY_V0 — PASS
 
 Replaying the same ordered session/hero command log from the same seed reproduces economy, lives, hero state, creep outcomes and terminal state hashes. Native OpenRealm presentation must be reconstructible from authoritative replay state rather than being a second source of truth.
+
+Closure evidence:
+
+- Repair candidate head: `e9b5f80e9e275cb311503d95872e5b7d56afd08c` on `repair/h7-progress-legality-v0`.
+- GitHub Actions run: `34419657230` — PASS.
+- Artifact: `hero-line-wars-native-h7-v0`, ID `10130455171`, SHA-256 `18b7602b9e741ff7e1549ced8065cf1cfddae5028774fccde94e3c668e336f0a`.
+- H1 through H6 browser regressions, deterministic H3-H5 host authority tests, full OpenRealm/Wasm compilation, H7 fractional-position legality, ordered public-command replay and artifact upload all passed in the same run.
+- Native creep position is reconstructed from authoritative current cell + deterministic next route cell + `progress_milli`; native semantic hashing uses deterministic fixed-point milli-world coordinates rather than float truncation.
+- Falsification proof placed a Scout at cell `(0,3)`, progress `250`, where coarse cell-only distance was `100` but authoritative interpolated distance was `90` against basic range `96`; the legal attack was accepted and exact native replay reproduced the partial-progress state.
+- H7 destructive replay reissues the saved ordered browser command journal from reset and reproduces authoritative session state/log hashes, hero/native semantic state, creep outcomes and terminal state while keeping presentation derived from authority.
+- Independent hostile review: `C0 / H1`. High: an accepted route-changing tower build could mutate the authoritative grid while leaving a partially-progressed creep's native mirror on the old route until the next step, allowing an immediate attack/cast to use stale pre-build native legality.
+- High repair: every accepted `TW_BrowserBuild` now immediately resynchronizes native creep presentation from the post-build authoritative grid before reporting product success; native sync failure enters the existing degraded fail-closed gate.
+- Targeted regression blocks `(1,3)` while a Scout is at `(0,3)` / progress `250`, proves the native semantic hash changes immediately with no intervening step, then proves the stale-route basic attack is rejected with HP, XP, session-log, command and native hashes unchanged.
+- The repaired route-changing state round-trips through H7 native replay exactly and OpenRealm WebGL2 remains alive.
+- Exactly one targeted re-review of the High repair: `C0 / H0`. Review budget consumed; no further review loop.
 
 ### H8 — BROWSER_PLAYABLE_SLICE_V0
 
