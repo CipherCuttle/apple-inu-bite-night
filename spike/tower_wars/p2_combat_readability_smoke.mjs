@@ -133,17 +133,27 @@ try {
     throw new Error(`P2 basic readiness did not derive from authoritative tick: ${JSON.stringify(ui)}`)
   }
 
+  // Falsify target attribution without touching simulation authority: make the
+  // presentation snapshot ambiguous by adding a second disappeared incoming ID.
+  // The authoritative XP delta still proves a hero kill occurred, but P2 must
+  // not guess which disappeared ID was killed.
+  await page.evaluate(() => {
+    const previous = globalThis.__HLW_P2?.combatPresentation?.previous
+    if (!previous) throw new Error('P2 missing prior presentation snapshot')
+    previous.creeps.push({ id: 0x7ffffffe, target: 0, hp: 1 })
+  })
+
   await page.click('#hero-attack')
   const firstKill = await snapshot(page)
   ui = await combatUi(page)
   if (firstKill.creeps.some((creep) => creep.id === firstScout) || firstKill.heroXP[0] !== 50 || firstKill.heroLevel[0] !== 1 ||
-      !ui.feed.includes(`KILL CONFIRMED · CREEP #${firstScout}`) || !ui.feed.includes('XP +50') ||
-      ui.progression !== 'LV 1 · XP 50' || ui.incoming !== 'INCOMING · 0') {
-    throw new Error(`P2 first-kill/XP presentation diverged: ${JSON.stringify({ firstKill, ui })}`)
+      !ui.feed.includes('KILL CONFIRMED') || ui.feed.includes(`KILL CONFIRMED · CREEP #${firstScout}`) ||
+      !ui.feed.includes('XP +50') || ui.progression !== 'LV 1 · XP 50' || ui.incoming !== 'INCOMING · 0') {
+    throw new Error(`P2 ambiguous kill/XP presentation diverged: ${JSON.stringify({ firstKill, ui })}`)
   }
 
   // A second authoritative kill through PHASE LANCE reaches the frozen H5 threshold.
-  // The presentation must observe the accepted cast, kill, XP gain and level transition.
+  // With one unambiguous disappearance, presentation may identify the exact creep.
   const secondScout = await sendScoutToHuman(page)
   await page.click('#hero-ability')
   const leveled = await snapshot(page)
@@ -179,6 +189,7 @@ try {
   console.log(`HLW_P2_EVIDENCE=${JSON.stringify({
     firstScoutVisibleHp: '45 HP',
     damagedScoutVisibleHp: '20 HP',
+    ambiguousKillFeedback: 'KILL CONFIRMED',
     firstKillXP: firstKill.heroXP[0],
     leveledXP: leveled.heroXP[0],
     leveledHero: leveled.heroLevel[0],
