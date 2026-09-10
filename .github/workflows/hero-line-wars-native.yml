@@ -77,6 +77,7 @@ jobs:
         run: |
           python3 spike/tower_wars/patch_hlw_h7_progress_browser.py
           python3 spike/tower_wars/patch_hlw_h7_command_journal.py
+          python3 spike/tower_wars/patch_hlw_h8_bot_scheduler.py
           git diff --check
           python3 spike/wasm/patch_menu_object_isolation.py
           python3 spike/tower_wars/patch_openrealm_tower_wars_build.py
