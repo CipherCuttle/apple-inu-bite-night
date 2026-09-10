@@ -20,6 +20,14 @@ controls_old = '''    .controls{padding:12px;display:grid;grid-template-columns:
 '''
 controls_new = '''    .controls{padding:12px;display:grid;grid-template-columns:1.45fr 1.05fr 1fr;gap:10px 14px;position:relative;z-index:2}
 '''
+arguments_old = '''    arguments: ['-data', '/share', '+map', '__wasm_smoke__'],
+'''
+arguments_new = '''    // H8 is an embedded browser control surface. OpenRealm's shipped WC3 config
+    // requests native fullscreen, which promotes the canvas into the browser top
+    // layer and makes sibling DOM controls non-hit-testable. Override only video
+    // presentation policy here; simulation/game authority remains unchanged.
+    arguments: ['-data', '/share', '+set', 'vid_native', '0', '+set', 'vid_fullscreen', '0', '+map', '__wasm_smoke__'],
+'''
 
 incoming_old = '''      if (distance > 48) {
         const goalX = clamp(tx, -160, 160)
@@ -78,6 +86,7 @@ anchor_new = '''    const [hx, hy] = heroPosition(1)
 for label, old, new in (
     ("playfield containment", layout_old, layout_new),
     ("control stacking", controls_old, controls_new),
+    ("embedded video policy", arguments_old, arguments_new),
     ("incoming pursuit", incoming_old, incoming_new),
     ("defensive anchor", anchor_old, anchor_new),
 ):
