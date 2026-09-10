@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_PLAYABLE_V1
 
-Status: IMPLEMENTING — P1 GREEN CANDIDATE / AWAITING INDEPENDENT REVIEW / P2-P5 INACTIVE
+Status: IMPLEMENTING — P1 PASS / P2 ACTIVE / P3-P5 INACTIVE
 
 Parent closure: `HERO_LINE_WARS_NATIVE_V0 = PASS` at `56361b751fd6da63e63fdcaf22347b5d0ff95de6`.
 
@@ -33,7 +33,7 @@ Everything closed by `HERO_LINE_WARS_NATIVE_V0` remains frozen unless a new expl
 - The closed Phaser/dog prototype remains closed.
 - PR #6 / H8 is not merge-authorized merely because this successor exists.
 
-## P1 — MATCH_CONTROL_LOOP_V1 — GREEN CANDIDATE / AWAITING INDEPENDENT REVIEW
+## P1 — MATCH_CONTROL_LOOP_V1 — PASS
 
 Goal: replace proof-oriented button stepping with a game-like continuous human control loop while keeping commands deterministic and public-boundary-only.
 
@@ -49,25 +49,45 @@ Acceptance:
 - H1-H8 regressions remain green.
 - Chromium proof demonstrates physical key input → public command → authoritative/native state change while WebGL2 remains alive.
 
-Validated code candidate: `3fea105b5db21d882260aa305090a4b17d906e5b`.
+Initial green candidate: `3fea105b5db21d882260aa305090a4b17d906e5b`.
 
-Validation evidence:
+Initial validation:
 
 - GitHub Actions run `34501809328` — PASS on exact candidate `3fea105b5db21d882260aa305090a4b17d906e5b`.
 - Artifact `hero-line-wars-playable-p1-v1`, ID `10162255492`, SHA-256 `0e725a8947436395d3b205cd40817258fa4edbcf88d29ea623609f67028cec92`.
 - Full inherited H1→H8 deterministic/native/browser regression chain remained green.
 - P1 Chromium proof passed sampled WASD/arrow movement, release-stop behavior, queued Space/E combat, focused-control shortcut isolation, pause stability, native replay exactness and WebGL2 survival.
-- A strengthened focus-isolation test initially failed because its own `#hero-center` click retained focus; the corrected smoke commit `3fea105b…` only blurs that fallback control before intentionally exercising global shortcuts. Runtime focus-isolation semantics remained unchanged.
 
-Review state:
+Independent hostile review:
 
-- Required independent hostile review has not yet closed this gate.
-- P1 remains a green candidate, not PASS, until that one review is evaluated under the bounded completion policy.
-- If the review reports Critical/High findings, repair only those findings and perform at most one targeted re-review; otherwise close P1 and move directly to P2.
+- PR #7 first Codex review on docs/review head `6082db022bccc00637077791a64bd0938f7b223e` reported one P1/High: clicking `Run match` left the button focused, so the global focused-control guard rejected subsequent WASD/arrow/Space/E input during the normal click-Run-then-keyboard flow.
+- The finding was accepted as gate-relevant because P1 explicitly requires game-like continuous keyboard control and accessible focused-control isolation simultaneously.
+
+High repair:
+
+- Semantic repair `8468de694995172174452bdf5e6c8903b87fe70a` changes only the P1 overlay so Run/Pause hands focus back to the game immediately after activation; other focused interactive/editable controls remain isolated from global shortcuts.
+- Regression commit `92e6ed643b8c0e3979a9bcf562db73527cf5afcc` strengthens the Chromium smoke to prove the exact normal flow `click Run → press D → hero moves`, while retaining pause stability, queued combat, replay and WebGL2 checks.
+
+Final validation:
+
+- GitHub Actions run `34508014497` — PASS on exact repair head `92e6ed643b8c0e3979a9bcf562db73527cf5afcc`.
+- Deterministic H3/H4/H5 host authority tests — PASS.
+- Pinned OpenRealm + all H1-H8/P1 overlays and Wasm compile — PASS.
+- Full H1→H8 browser regressions + strengthened P1 Chromium proof — PASS.
+- Browser failure trace and diagnostic-bundle uploads were skipped because the browser gate passed.
+- Artifact `hero-line-wars-playable-p1-v1`, ID `10164721862`, SHA-256 `65da74aa9305beaa060a5df14f86d58bc44d847c932ea50448554cf159b6bb40`.
+
+Targeted re-review:
+
+- One targeted Codex re-review was requested on exact repair head `92e6ed643b…`, restricted to the single High repair and inherited authority boundaries.
+- Codex returned `👍` with no further suggestions. `C0/H0` for the targeted repair.
+- P1 review budget is consumed. No further P1 review loop is authorized.
+
+Result: `P1 MATCH_CONTROL_LOOP_V1 = PASS`.
 
 Non-goals for P1: rebalance, new abilities, new movement physics, camera system, art overhaul, economy changes.
 
-## P2 — COMBAT_READABILITY_V1 — INACTIVE
+## P2 — COMBAT_READABILITY_V1 — ACTIVE
 
 Goal: make native combat state legible enough that a human can understand target pressure, attacks, ability use and progression without reading debug logs.
 
