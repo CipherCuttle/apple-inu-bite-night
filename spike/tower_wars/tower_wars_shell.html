@@ -233,7 +233,7 @@
     const state = snap()
     const hero0 = heroPosition(0)
     const hero1 = heroPosition(1)
-    byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span><span>LV <b>${state.heroLevel[0]}</b></span><span>XP <b>${state.heroXP[0]}</b></span><span>DMG <b>${state.heroDamage[0]}</b></span><span>POS <b>${hero0[0]},${hero0[1]}</b></span>`
+    byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span><span>LV <b>${state.heroLevel[0]}</b></span><span>XP <b>${state.heroXP[0]}</b></span><span>DMG <b>${state.heroBasicDamage[0]}</b></span><span>POS <b>${hero0[0]},${hero0[1]}</b></span>`
     byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><span>LV <b>${state.heroLevel[1]}</b></span><span>XP <b>${state.heroXP[1]}</b></span><span>POS <b>${hero1[0]},${hero1[1]}</b></span><b class="enemy">BOT</b>`
     byId('clock').textContent = `TICK ${state.tick} · LOG ${state.eventCount} · CREEPS ${state.activeCount}`
     byId('path0').textContent = `PATH ${state.players[0].pathLength}`
