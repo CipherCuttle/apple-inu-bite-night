@@ -198,12 +198,20 @@ try {
     throw new Error(`P1 action replay diverged: ${JSON.stringify({ actionReceiptBefore, actionReceiptAfter })}`)
   }
 
-  // The browser interval is only a scheduler for playTick. While Run match is
-  // active ticks and native movement advance; after Pause both remain frozen.
+  // Normal player flow is click Run, then use keyboard. Run/Pause must hand focus
+  // back to the game so the focused-control guard does not disable WASD/Space/E.
+  // While running, the interval schedules authoritative playTick only; after Pause
+  // both authoritative tick and native position must remain frozen.
   await page.evaluate(() => globalThis.__TW_API.reset())
-  await page.keyboard.down('d')
   await page.click('#play')
+  const runFocus = await page.evaluate(() => document.activeElement?.id ?? '')
+  if (runFocus === 'play') throw new Error('P1 Run retained focus and blocked game shortcuts')
+  await page.keyboard.down('d')
   await page.waitForFunction(() => globalThis.__TW_API.snapshot().tick >= 2, { timeout: 3_000, polling: 25 })
+  const runningHero = await heroPosition(page)
+  if (runningHero[0] <= -120) {
+    throw new Error(`P1 click-Run then keyboard movement did not advance hero: ${JSON.stringify(runningHero)}`)
+  }
   await page.click('#play')
   await page.keyboard.up('d')
   const pausedState = await snapshot(page)
@@ -227,6 +235,8 @@ try {
 
   console.log(`HLW_P1_EVIDENCE=${JSON.stringify({
     focusedControlIsolated: !focusedControlInput.attackQueued && !focusedControlInput.abilityQueued,
+    runFocusReleased: runFocus !== 'play',
+    clickRunKeyboardMovement: runningHero,
     heldMovement: [initial, afterMove1, afterMove2],
     releaseStop: afterStopTick,
     queuedBasicDamage: [45, attacked.creeps.find((creep) => creep.id === scout.id)?.hp],
