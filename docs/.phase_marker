@@ -1,2 +1,3 @@
-successor=phase-hlw/openrealm-native-v0
-parent=90b427ff703898954f418525707d9437aa84be2f
+successor=phase-hlw/playable-v1
+parent=56361b751fd6da63e63fdcaf22347b5d0ff95de6
+contract=docs/HERO_LINE_WARS_PLAYABLE_V1.md
