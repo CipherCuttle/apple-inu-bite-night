@@ -1,6 +1,6 @@
 # HERO_LINE_WARS_PLAYABLE_V1
 
-Status: IMPLEMENTING — P1 PASS / P2 PASS / P3 ACTIVE / P4-P5 INACTIVE
+Status: IMPLEMENTING — P1 PASS / P2 PASS / P3 PASS / P4 ACTIVE / P5 INACTIVE
 
 Parent closure: `HERO_LINE_WARS_NATIVE_V0 = PASS` at `56361b751fd6da63e63fdcaf22347b5d0ff95de6`.
 
@@ -141,20 +141,60 @@ Targeted re-review:
 
 Result: `P2 COMBAT_READABILITY_V1 = PASS`.
 
-## P3 — SEND_ECONOMY_READABILITY_V1 — ACTIVE
+## P3 — SEND_ECONOMY_READABILITY_V1 — PASS
 
 Goal: make offensive decisions understandable before committing them.
 
-Acceptance direction:
+Acceptance:
 
 - Each send communicates authoritative cost and income gain.
-- Affordability/readiness derives from current authoritative snapshot; rejection remains authoritative and fail-closed.
+- Affordability/readiness derives from current authoritative state; rejection remains authoritative and fail-closed.
 - The player can see own gold/income/lives and rival pressure without exposing hidden mutation controls.
 - Sending through keyboard/pointer uses the existing public send command only.
 
 No balance changes are authorized by this gate.
 
-## P4 — MATCH_LIFECYCLE_BOT_PACING_V1 — INACTIVE
+Implementation/authority notes:
+
+- P3 exposes read-only browser accessors for creep count/cost/income gain/capacity and full-authority outbound active count, queued send count and outbound hit points.
+- Cost and income gain come from `tw_creep_def()`, the same definitions used by authoritative `tw_match_apply_action`; the former browser-owned bot send-cost table was removed.
+- Human pointer and `1–4` keyboard sends both funnel through `_TW_BrowserSend(0, kind)`. Deterministic bot sends remain `_TW_BrowserSend(1, kind)` and its affordability check uses the read-only authoritative cost accessor.
+- UI readiness is advisory only. An unaffordable send remains physically callable so `_TW_BrowserSend` remains the rejecting authority.
+- Rival-pressure readout uses full authoritative active/pending arrays rather than the snapshot presentation list, which intentionally serializes only a bounded visible creep subset.
+- No raw match/session mutation export was added and no balance value changed.
+
+Initial P3 candidate: `ce4411eec622f33761e433daab49c60ddca65c00`.
+
+Initial validation:
+
+- GitHub Actions run `34523653036` — PASS.
+- Artifact `hero-line-wars-playable-p3-v1`, ID `10170752736`, SHA-256 `ad7964984216b0a336c036bc8e34bb4e1263090ecdec86a042fbbe62737d4847`.
+
+Pre-review truthfulness hardening:
+
+- A bounded pre-review check identified that pressure derived from the snapshot creep list could undercount waves above its 64-creep presentation cap while authoritative capacity is 256.
+- `b50cf4fd427f22f014d1c6cd1a38eacfe9daddba` moved pressure active/queued/HP facts to read-only accessors scanning the complete authoritative match.
+- `bfdb06e083b578784e819c7f0abeb8aa6e1cbe96` strengthened the Chromium proof to cover queued-only, active-only and mixed pressure plus immutable pressure facts across an authoritative rejected send.
+
+Final validation:
+
+- GitHub Actions run `34529944153` — PASS on exact frozen candidate `bfdb06e083b578784e819c7f0abeb8aa6e1cbe96`.
+- Deterministic H3/H4/H5 host authority tests — PASS.
+- Pinned OpenRealm / Emscripten 6.0.9 / Wasm compile — PASS.
+- Complete H1→H8 browser regression chain — PASS.
+- P1 and P2 Chromium regressions — PASS.
+- Strengthened P3 Chromium proof — PASS, including physical keyboard/pointer sends, full-authority queued/active/mixed pressure, fail-closed unaffordable rejection, exact replay and WebGL2 survival.
+- Artifact `hero-line-wars-playable-p3-v1`, ID `10173344967`, SHA-256 `f80dc95d12e013da3ef90e87b5d73aa340a982ce06e96f33b45a74a3e654b688`.
+
+Independent hostile review:
+
+- The single broad Codex review was requested on exact frozen candidate `bfdb06e083…`, restricted to P3 and inherited authority invariants.
+- Codex returned: `Didn't find any major issues. Delightful!` on reviewed commit `bfdb06e083`. `C0/H0`.
+- No repair or targeted rereview was required. P3 review budget is consumed; no further P3 review loop is authorized.
+
+Result: `P3 SEND_ECONOMY_READABILITY_V1 = PASS`.
+
+## P4 — MATCH_LIFECYCLE_BOT_PACING_V1 — ACTIVE
 
 Goal: turn deterministic bot actions and terminal state into a coherent beginning/middle/end match flow.
 
