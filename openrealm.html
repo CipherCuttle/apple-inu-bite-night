@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hero Line Wars — OpenRealm Core</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07090d;--panel:#10151b;--line:#27313d;--text:#edf3f8;--muted:#84909c;--human:#62d9c5;--enemy:#ffad5c;--path:#1b3540;--cell:#121a22;--good:#78e08f}
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    #canvas{position:fixed;inset:0;width:100vw;height:100vh;opacity:.16;filter:saturate(.55) contrast(1.1);pointer-events:none}
+    #tw-root{position:fixed;z-index:5;inset:0;padding:18px;display:flex;justify-content:center;overflow:auto;background:linear-gradient(180deg,#07090dd8,#07090dee)}
+    .shell{width:min(1180px,100%);display:grid;grid-template-rows:auto auto 1fr auto;gap:12px;min-height:680px}
+    header,.bar,.field-card,.controls{border:1px solid var(--line);background:#0b1016e8;box-shadow:0 12px 36px #0008}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+    h1{font-size:16px;letter-spacing:.12em;margin:0;font-weight:700}
+    .badge{border:1px solid #3c4d5d;padding:5px 8px;color:#b8c8d6;background:#111a22}
+    #tw-status{color:var(--muted);margin-top:4px}
+    .bar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:10px 14px;gap:16px}
+    .statline{display:flex;gap:12px;flex-wrap:wrap}
+    .statline b{color:#fff}
+    .right{text-align:right;justify-content:flex-end}
+    .center{text-align:center;color:var(--muted);font-size:11px}
+    .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0;overflow:hidden;position:relative;z-index:1}
+    .field-card{padding:12px;display:grid;grid-template-rows:auto 1fr;gap:10px;min-height:0;overflow:hidden}
+    .field-head{display:flex;align-items:center;justify-content:space-between}
+    .human{color:var(--human)} .enemy{color:var(--enemy)}
+    .grid{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);gap:3px;align-self:stretch;width:100%;height:100%;min-height:0;user-select:none}
+    .cell{position:relative;border:1px solid #202a35;background:var(--cell);min-width:0;min-height:0;transition:.12s border-color,.12s background}
+    .field-card[data-player="0"] .cell{cursor:crosshair}
+    .field-card[data-player="0"] .cell:hover{border-color:#64808e}
+    .cell.path{background:var(--path)}
+    .cell.entry::before,.cell.exit::before{position:absolute;inset:3px;font-size:9px;color:#8fa2b0;content:'IN'}
+    .cell.exit::before{content:'OUT';text-align:right}
+    .tower{position:absolute;left:50%;top:50%;width:42%;aspect-ratio:1;transform:translate(-50%,-50%) rotate(45deg);border:2px solid var(--human);background:#163a37}
+    .tower.k1{border-radius:50%;transform:translate(-50%,-50%);background:#173341}
+    .tower.k2{transform:translate(-50%,-50%);border-color:#a3d6ff;background:#24303e}
+    .creep{position:absolute;left:50%;top:50%;width:28%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);background:var(--enemy);box-shadow:0 0 0 2px #29190b,0 0 14px #ffad5c66}
+    .creep.human-send{background:var(--human);box-shadow:0 0 0 2px #0d2824,0 0 14px #62d9c566}
+    .controls{padding:12px;display:grid;grid-template-columns:1.45fr 1.05fr 1fr;gap:10px 14px;position:relative;z-index:2}
+    .group{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .group strong{font-size:11px;color:var(--muted);margin-right:4px}
+    .hero-group{grid-column:1/-1;padding-bottom:10px;border-bottom:1px solid #202a35}
+    button{appearance:none;border:1px solid #344554;background:#121b24;color:var(--text);padding:8px 10px;font:inherit;cursor:pointer}
+    button:hover{background:#192631;border-color:#567083}
+    button.active{border-color:var(--human);color:var(--human)}
+    button.primary{border-color:#4c7f75;color:#a7f3e4;background:#10221f}
+    button.warn{border-color:#845d38;color:#ffd0a3;background:#241a11}
+    #bot-status{color:var(--enemy);font-size:11px}
+    .key-hint{color:var(--muted);font-size:10px;letter-spacing:.04em;margin-left:auto}
+    #message{grid-column:1/-1;min-height:18px;color:var(--muted)}
+    .ok{color:var(--good)!important}.bad{color:#ff7777!important}
+    .combat-readout{grid-column:1/-1;display:grid;grid-template-columns:minmax(250px,.8fr) 1.2fr;gap:12px;padding:10px 0;border-bottom:1px solid #202a35}
+    .combat-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .combat-status strong{font-size:11px;color:var(--muted);margin-right:3px}
+    .combat-pill{border:1px solid #344554;background:#101820;padding:5px 7px;font-size:10px;letter-spacing:.03em;white-space:nowrap}
+    .combat-pill[data-ready="true"]{border-color:#4c7f75}
+    .combat-pill[data-ready="false"]{border-color:#845d38}
+    .combat-feed{min-height:30px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:10px;color:#c7d4df}
+    .combat-event{border-left:2px solid #567083;background:#0d141b;padding:5px 7px;white-space:nowrap}
+    .combat-empty{color:var(--muted)}
+    .economy-readout{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #202a35;font-size:10px}
+    .economy-fact{border-left:2px solid #3a5668;background:#0d141b;padding:6px 8px;white-space:nowrap}
+    .economy-fact strong{color:#fff}
+    .send-group button{font-size:10px;padding:7px 8px}
+    .send-group button[data-ready="true"]{border-color:#4c7f75;color:#b8f5e9}
+    .send-group button[data-ready="false"]{border-color:#684d3a;color:#d7b28f;background:#17130f}
+    #send-feedback{color:#c7d4df;min-width:190px;text-align:right}
+    .lifecycle-strip{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #202a35;font-size:10px}
+    .lifecycle-phase{min-width:82px;border:1px solid #3a5668;background:#0d141b;padding:6px 8px;text-align:center;font-weight:700;letter-spacing:.08em}
+    .lifecycle-phase[data-phase="READY"]{border-color:#567083}
+    .lifecycle-phase[data-phase="START"],.lifecycle-phase[data-phase="RUNNING"]{border-color:#4c7f75;color:#b8f5e9}
+    .lifecycle-phase[data-phase="PAUSED"]{border-color:#845d38;color:#ffd0a3}
+    .lifecycle-phase[data-phase="TERMINAL"]{border-color:#9b5361;color:#ffc2cc}
+    #lifecycle-detail{color:#d8e2ea}
+    #bot-pace{color:var(--enemy);text-align:right;white-space:nowrap}
+    .creep-hp{position:absolute;left:50%;top:calc(100% + 3px);transform:translateX(-50%);font-size:8px;line-height:1;white-space:nowrap;color:#fff;background:#090c10e8;border:1px solid #394652;padding:2px 3px;border-radius:2px;pointer-events:none}
+    @media (prefers-reduced-motion: reduce){.cell,.combat-event{transition:none!important;animation:none!important}}
+    @media(max-width:820px){body{overflow:auto}#tw-root{position:absolute;min-height:100%;padding:8px}.shell{min-height:1000px}.fields{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.hero-group,#message{grid-column:1}.bar{grid-template-columns:1fr}.right{text-align:left;justify-content:flex-start}.center{text-align:left}}
+  </style>
+</head>
+<body>
+<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+<div id="tw-root">
+  <div class="shell">
+    <header>
+      <div><h1>HERO LINE WARS // LOCAL 1V1</h1><div id="tw-status">booting OpenRealm + authoritative session…</div></div>
+      <div class="badge">OPENREALM / WASM</div>
+    </header>
+    <div class="bar">
+      <div id="stats0" class="statline"></div>
+      <div id="clock" class="center">TICK 0 · LOG 0</div>
+      <div id="stats1" class="statline right"></div>
+    </div>
+    <div class="fields">
+      <section class="field-card" data-player="0"><div class="field-head"><b class="human">YOUR LINE</b><span id="path0"></span></div><div id="grid0" class="grid"></div></section>
+      <section class="field-card" data-player="1"><div class="field-head"><b class="enemy">RIVAL LINE</b><span id="path1"></span></div><div id="grid1" class="grid"></div></section>
+    </div>
+    <div class="controls">
+      <div class="group hero-group"><strong>HERO</strong><button id="hero-center">Lane center</button><button id="hero-left">←</button><button id="hero-right">→</button><button id="hero-up">↑</button><button id="hero-down">↓</button><button id="hero-attack" class="primary">Basic attack</button><button id="hero-ability" class="warn">PHASE LANCE · 15</button><span id="bot-status">BOT: READY</span><span class="key-hint">WASD / ARROWS · SPACE ATTACK · E LANCE</span></div>
+      <div id="lifecycle-strip" class="lifecycle-strip" aria-label="Match lifecycle">
+        <span id="lifecycle-state" class="lifecycle-phase" data-phase="READY" role="status" aria-live="polite" aria-atomic="true">READY</span>
+        <span id="lifecycle-detail">PRESS START · AUTHORITATIVE TICK 0</span>
+        <span id="bot-pace">BOT PACE · WAITING</span>
+      </div>
+      <div id="combat-readout" class="combat-readout">
+        <div class="combat-status" aria-label="Player combat status">
+          <strong>COMBAT</strong>
+          <span id="hero-progression" class="combat-pill">LV 1 · XP 0</span>
+          <span id="incoming-status" class="combat-pill">INCOMING · 0</span>
+          <span id="basic-state" class="combat-pill" data-ready="true">BASIC · READY</span>
+          <span id="ability-state" class="combat-pill" data-ready="true">LANCE · READY</span>
+        </div>
+        <div id="combat-feed" class="combat-feed" role="status" aria-live="polite" aria-atomic="false"><span class="combat-empty">COMBAT FEED · NO ACCEPTED COMBAT YET</span></div>
+      </div>
+      <div id="economy-readout" class="economy-readout" aria-label="Send economy status">
+        <div id="own-economy" class="economy-fact">YOU · GOLD <strong>0</strong> · INCOME <strong>0</strong> · LIVES <strong>0</strong></div>
+        <div id="rival-pressure" class="economy-fact">RIVAL PRESSURE · <strong>0 ACTIVE</strong> · <strong>0 QUEUED</strong> · RIVAL LIVES <strong>0</strong></div>
+        <div id="send-feedback" role="status" aria-live="polite">SEND · NO COMMAND YET</div>
+      </div>
+      <div class="group"><strong>BUILD</strong><button data-tower="0" class="active">Needle 50</button><button data-tower="1">Pulse 75</button><button data-tower="2">Anvil 100</button><span>click your grid</span></div>
+      <div class="group send-group"><strong>SEND</strong><button data-send="0">Scout</button><button data-send="1">Swarm</button><button data-send="2">Brute</button><button data-send="3">Siege</button><span class="key-hint">1–4 SEND</span></div>
+      <div class="group"><button id="play" class="primary">Run match</button><button id="step">Play tick</button><button id="step10">+10 play</button><button id="replay">Verify H7 replay</button><button id="reset">Reset</button></div>
+      <div id="message"></div>
+    </div>
+  </div>
+</div>
+<script>
+  let selectedTower = 0
+  let playTimer = null
+  let heroMode = false
+  const BOT_SEND_SEQUENCE = [0, 1, 0, 2]
+  const botState = { sendIndex: 0, lastActTick: -1, lastMoveGoal: '', actions: [] }
+  const heldKeys = new Set()
+  const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'])
+  const ACTION_KEYS = new Set(['Space', 'KeyE'])
+  const inputState = {
+    attackQueued: false,
+    abilityQueued: false,
+    wasMoving: false,
+    samples: 0,
+    movementCommands: 0,
+    stopCommands: 0,
+    attackCommands: 0,
+    abilityCommands: 0,
+    lastSample: null,
+  }
+  const combatPresentation = { previous: null, events: [], feedRevision: 0, renderedFeedRevision: 0 }
+  const SEND_NAMES = ['Scout', 'Swarm', 'Brute', 'Siege']
+  const SEND_KEYS = new Map([['Digit1', 0], ['Digit2', 1], ['Digit3', 2], ['Digit4', 3]])
+  const lifecyclePresentation = { phase: null, transitions: [] }
+  const byId = (id) => document.getElementById(id)
+
+  function snap() {
+    const ptr = Module._TW_BrowserSnapshot()
+    return JSON.parse(Module.UTF8ToString(ptr))
+  }
+
+  function apiCall(name, ...args) {
+    const fn = Module[name]
+    if (typeof fn !== 'function') throw new Error(`missing wasm export ${name}`)
+    return fn(...args)
+  }
+
+  function heroPosition(actor) {
+    return [apiCall('_HLW_BrowserHeroX', actor), apiCall('_HLW_BrowserHeroY', actor)]
+  }
+
+  function setMessage(text, ok = null) {
+    const el = byId('message')
+    el.textContent = text
+    el.className = ok === true ? 'ok' : ok === false ? 'bad' : ''
+  }
+
+  function recordBot(action) {
+    botState.actions.push(action)
+    if (botState.actions.length > 64) botState.actions.shift()
+    byId('bot-status').textContent = `BOT: ${action.kind.toUpperCase()}${action.detail ? ` · ${action.detail}` : ''}`
+    return action
+  }
+
+  function resetBot() {
+    botState.sendIndex = 0
+    botState.lastActTick = -1
+    botState.lastMoveGoal = ''
+    botState.actions.length = 0
+    byId('bot-status').textContent = 'BOT: READY'
+  }
+
+  function cellWorld(creep) {
+    return [
+      -160 + creep.x * 40,
+      82 + (creep.y - 3) * 22,
+    ]
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value))
+  }
+
+  function releaseHumanInput() {
+    heldKeys.clear()
+    inputState.attackQueued = false
+    inputState.abilityQueued = false
+  }
+
+  function resetHumanInput() {
+    releaseHumanInput()
+    inputState.wasMoving = false
+    inputState.samples = 0
+    inputState.movementCommands = 0
+    inputState.stopCommands = 0
+    inputState.attackCommands = 0
+    inputState.abilityCommands = 0
+    inputState.lastSample = null
+  }
+
+  function sampleHumanInput(state = snap()) {
+    if (!heroMode || state.terminal) return null
+
+    const horizontal = Number(heldKeys.has('KeyD') || heldKeys.has('ArrowRight')) -
+      Number(heldKeys.has('KeyA') || heldKeys.has('ArrowLeft'))
+    const vertical = Number(heldKeys.has('KeyW') || heldKeys.has('ArrowUp')) -
+      Number(heldKeys.has('KeyS') || heldKeys.has('ArrowDown'))
+    const [x, y] = heroPosition(0)
+    let moveResult = null
+    let stopResult = null
+
+    if (horizontal || vertical) {
+      const goalX = clamp(x + horizontal * 40, -160, 160)
+      const goalY = clamp(y + vertical * 22, -160, -24)
+      moveResult = apiCall('_HLW_BrowserHeroMove', 0, goalX, goalY)
+      inputState.movementCommands++
+      inputState.wasMoving = moveResult === 1
+    } else if (inputState.wasMoving) {
+      // Key release becomes a deterministic stop command on the next authoritative
+      // play tick. Browser key timing never advances native movement by itself.
+      stopResult = apiCall('_HLW_BrowserHeroMove', 0, x, y)
+      inputState.stopCommands++
+      if (stopResult === 1) inputState.wasMoving = false
+    }
+
+    const abilityRequested = inputState.abilityQueued
+    const attackRequested = inputState.attackQueued
+    inputState.abilityQueued = false
+    inputState.attackQueued = false
+
+    let abilityResult = null
+    let attackResult = null
+    // Freeze command ordering when both actions arrive between ticks: movement,
+    // PHASE LANCE, then basic attack. Every mutation still enters the existing
+    // actor-indexed public authority functions.
+    if (abilityRequested) {
+      abilityResult = apiCall('_HLW_BrowserHeroAbility', 0)
+      inputState.abilityCommands++
+    }
+    if (attackRequested) {
+      attackResult = apiCall('_HLW_BrowserHeroAttack', 0)
+      inputState.attackCommands++
+    }
+
+    inputState.samples++
+    inputState.lastSample = {
+      tick: state.tick, horizontal, vertical, moveResult, stopResult,
+      abilityRequested, abilityResult, attackRequested, attackResult,
+    }
+    return inputState.lastSample
+  }
+
+  function resetCombatPresentation() {
+    combatPresentation.previous = null
+    combatPresentation.events.length = 0
+    combatPresentation.feedRevision += 1
+    renderCombatFeed()
+  }
+
+  function combatSnapshot(state) {
+    return {
+      tick: state.tick,
+      heroLevel: [...state.heroLevel],
+      heroXP: [...state.heroXP],
+      heroReady: [...state.heroReady],
+      heroAbilityReady: [...state.heroAbilityReady],
+      creeps: state.creeps.map((creep) => ({ id: creep.id, target: creep.target, hp: creep.hp })),
+    }
+  }
+
+  function pushCombatEvent(tick, text) {
+    combatPresentation.events.unshift({ tick, text })
+    if (combatPresentation.events.length > 8) combatPresentation.events.length = 8
+    combatPresentation.feedRevision += 1
+  }
+
+  function renderCombatFeed() {
+    const feed = byId('combat-feed')
+    if (!feed || combatPresentation.renderedFeedRevision === combatPresentation.feedRevision) return
+    if (!combatPresentation.events.length) {
+      const empty = document.createElement('span')
+      empty.className = 'combat-empty'
+      empty.textContent = 'COMBAT FEED · NO ACCEPTED COMBAT YET'
+      feed.replaceChildren(empty)
+      combatPresentation.renderedFeedRevision = combatPresentation.feedRevision
+      return
+    }
+    feed.replaceChildren(...combatPresentation.events.map((event) => {
+      const item = document.createElement('span')
+      item.className = 'combat-event'
+      item.textContent = `T${event.tick} · ${event.text}`
+      return item
+    }))
+    combatPresentation.renderedFeedRevision = combatPresentation.feedRevision
+  }
+
+  function updateCombatPresentation(state) {
+    const current = combatSnapshot(state)
+    const previous = combatPresentation.previous
+
+    if (previous) {
+      const priorIncoming = new Map(previous.creeps.filter((creep) => creep.target === 0).map((creep) => [creep.id, creep]))
+      const currentIncoming = new Map(current.creeps.filter((creep) => creep.target === 0).map((creep) => [creep.id, creep]))
+      const disappeared = []
+
+      for (const [id, before] of priorIncoming) {
+        const after = currentIncoming.get(id)
+        if (after && after.hp < before.hp) {
+          pushCombatEvent(current.tick, `DAMAGE · CREEP #${id} · HP ${before.hp}→${after.hp}`)
+        } else if (!after) {
+          disappeared.push(id)
+        }
+      }
+
+      if (current.heroReady[0] > previous.heroReady[0]) {
+        pushCombatEvent(current.tick, `BASIC ACCEPTED · READY T${current.heroReady[0]}`)
+      }
+      if (current.heroAbilityReady[0] > previous.heroAbilityReady[0]) {
+        pushCombatEvent(current.tick, `PHASE LANCE ACCEPTED · READY T${current.heroAbilityReady[0]}`)
+      }
+
+      const xpGain = current.heroXP[0] - previous.heroXP[0]
+      if (xpGain > 0) {
+        const killLabel = disappeared.length === 1
+          ? `KILL CONFIRMED · CREEP #${disappeared[0]}`
+          : 'KILL CONFIRMED'
+        pushCombatEvent(current.tick, killLabel)
+        pushCombatEvent(current.tick, `XP +${xpGain}`)
+      }
+      if (current.heroLevel[0] > previous.heroLevel[0]) {
+        pushCombatEvent(current.tick, `LEVEL UP · LV ${current.heroLevel[0]}`)
+      }
+    }
+
+    combatPresentation.previous = current
+
+    const basicRemaining = Math.max(0, state.heroReady[0] - state.tick)
+    const abilityRemaining = Math.max(0, state.heroAbilityReady[0] - state.tick)
+    const incoming = state.creeps.filter((creep) => creep.target === 0)
+    const incomingHp = incoming.length ? Math.min(...incoming.map((creep) => creep.hp)) : null
+
+    byId('hero-progression').textContent = `LV ${state.heroLevel[0]} · XP ${state.heroXP[0]}`
+    byId('incoming-status').textContent = incomingHp === null
+      ? 'INCOMING · 0'
+      : `INCOMING · ${incoming.length} · LOW HP ${incomingHp}`
+
+    const basic = byId('basic-state')
+    basic.dataset.ready = basicRemaining === 0 ? 'true' : 'false'
+    basic.textContent = basicRemaining === 0 ? 'BASIC · READY' : `BASIC · ${basicRemaining}T`
+
+    const ability = byId('ability-state')
+    ability.dataset.ready = abilityRemaining === 0 ? 'true' : 'false'
+    ability.textContent = abilityRemaining === 0 ? 'LANCE · READY' : `LANCE · ${abilityRemaining}T`
+
+    renderCombatFeed()
+  }
+
+  function creepCost(kind) {
+    return apiCall('_TW_BrowserCreepCost', kind)
+  }
+
+  function creepIncomeGain(kind) {
+    return apiCall('_TW_BrowserCreepIncomeGain', kind)
+  }
+
+  function sendName(kind) {
+    return SEND_NAMES[kind] ?? `Creep ${kind}`
+  }
+
+  function renderEconomy(state) {
+    const player = state.players[0]
+    const rival = state.players[1]
+    const outboundCount = apiCall('_TW_BrowserOutboundCount', 0)
+    const pendingOutbound = apiCall('_TW_BrowserPendingSendCount', 0)
+    const outboundHp = apiCall('_TW_BrowserOutboundHitPoints', 0)
+    const maxCreeps = apiCall('_TW_BrowserMaxCreeps')
+    const capacityReady = state.activeCount + state.pendingCount < maxCreeps
+
+    byId('own-economy').innerHTML = `YOU · GOLD <strong>${player.gold}</strong> · INCOME <strong>${player.income}</strong> · LIVES <strong>${player.lives}</strong>`
+    byId('rival-pressure').innerHTML = `RIVAL PRESSURE · <strong>${outboundCount} ACTIVE</strong> · <strong>${pendingOutbound} QUEUED</strong> · OUTBOUND HP <strong>${outboundHp}</strong> · RIVAL LIVES <strong>${rival.lives}</strong>`
+
+    document.querySelectorAll('[data-send]').forEach((button) => {
+      const kind = Number(button.dataset.send)
+      const cost = creepCost(kind)
+      const incomeGain = creepIncomeGain(kind)
+      const affordable = cost >= 0 && player.gold >= cost
+      const ready = !state.terminal && affordable && capacityReady
+      const status = state.terminal
+        ? 'MATCH ENDED'
+        : !affordable
+          ? `NEED ${Math.max(0, cost - player.gold)}G`
+          : !capacityReady
+            ? 'CAP FULL'
+            : 'READY'
+      button.dataset.cost = String(cost)
+      button.dataset.incomeGain = String(incomeGain)
+      button.dataset.affordable = affordable ? 'true' : 'false'
+      button.dataset.ready = ready ? 'true' : 'false'
+      button.textContent = `${kind + 1} ${sendName(kind)} · ${cost}G → +${incomeGain} INC · ${status}`
+      button.title = `Send ${sendName(kind)}: authoritative cost ${cost} gold, income gain ${incomeGain}; ${status}`
+    })
+  }
+
+  function sendCreep(kind, source = 'pointer') {
+    const before = snap()
+    const ok = apiCall('_TW_BrowserSend', 0, kind) === 1
+    const after = snap()
+    const name = sendName(kind)
+    if (ok) {
+      const goldSpent = before.players[0].gold - after.players[0].gold
+      const incomeGain = after.players[0].income - before.players[0].income
+      byId('send-feedback').textContent = `SEND ACCEPTED · ${name} · -${goldSpent}G · +${incomeGain} INC`
+      setMessage(`${source} send accepted · ${name}`, true)
+    } else {
+      byId('send-feedback').textContent = `SEND REJECTED · ${name} · AUTHORITATIVE`
+      setMessage(`${source} send rejected · ${name}`, false)
+    }
+    render()
+    return ok ? 1 : 0
+  }
+
+  function resetLifecyclePresentation() {
+    lifecyclePresentation.phase = null
+    lifecyclePresentation.transitions.length = 0
+  }
+
+  function deriveLifecycle(state = snap()) {
+    if (state.terminal) return 'TERMINAL'
+    if (playTimer) return state.tick === 0 ? 'START' : 'RUNNING'
+    return state.tick === 0 ? 'READY' : 'PAUSED'
+  }
+
+  function renderLifecycle(state = snap()) {
+    if (!heroMode) return null
+    const phase = deriveLifecycle(state)
+    const phaseNode = byId('lifecycle-state')
+    if (phaseNode && lifecyclePresentation.phase !== phase) {
+      lifecyclePresentation.phase = phase
+      lifecyclePresentation.transitions.push({ phase, tick: state.tick, eventCount: state.eventCount })
+      if (lifecyclePresentation.transitions.length > 32) lifecyclePresentation.transitions.shift()
+      phaseNode.dataset.phase = phase
+      phaseNode.textContent = phase
+    }
+
+    const detail = byId('lifecycle-detail')
+    if (detail) {
+      if (phase === 'TERMINAL') {
+        const outcome = state.winner === 0 ? 'YOU WIN' : state.winner === 1 ? 'BOT WINS' : 'MATCH TERMINAL'
+        detail.textContent = `${outcome} · YOU ${state.players[0].lives} LIVES · BOT ${state.players[1].lives} LIVES · TICK ${state.tick}`
+      } else if (phase === 'START') {
+        detail.textContent = 'MATCH START · FIRST AUTHORITATIVE TICK PENDING'
+      } else if (phase === 'RUNNING') {
+        detail.textContent = `MATCH RUNNING · AUTHORITATIVE TICK ${state.tick}`
+      } else if (phase === 'PAUSED') {
+        detail.textContent = `MATCH PAUSED · AUTHORITATIVE TICK ${state.tick}`
+      } else {
+        detail.textContent = 'PRESS START · AUTHORITATIVE TICK 0'
+      }
+    }
+
+    const lastAction = botState.actions.length ? botState.actions[botState.actions.length - 1] : null
+    const botPace = byId('bot-pace')
+    if (botPace) {
+      botPace.textContent = lastAction
+        ? `BOT PACE · MAX 1 ACTION / PLAY TICK · LAST T${botState.lastActTick} ${lastAction.kind.toUpperCase()}`
+        : 'BOT PACE · MAX 1 ACTION / PLAY TICK · WAITING'
+    }
+
+    const play = byId('play')
+    if (play) {
+      play.textContent = phase === 'TERMINAL'
+        ? 'Restart match'
+        : phase === 'READY'
+          ? 'Start match'
+          : phase === 'PAUSED'
+            ? 'Resume match'
+            : 'Pause match'
+    }
+    return phase
+  }
+
+  function botAct(state = snap()) {
+    if (state.terminal) return recordBot({ tick: state.tick, kind: 'terminal' })
+    if (botState.lastActTick === state.tick) return { tick: state.tick, kind: 'already-acted' }
+    botState.lastActTick = state.tick
+
+    const incoming = state.creeps.filter((creep) => creep.target === 1).sort((a, b) => a.id - b.id)
+    if (incoming.length) {
+      const target = incoming[0]
+      const [tx, ty] = cellWorld(target)
+      const [hx, hy] = heroPosition(1)
+      const dx = tx - hx
+      const dy = ty - hy
+      const distance = Math.hypot(dx, dy)
+
+      if (distance > 48) {
+        // Native hero movement resolves X before Y. Align vertically first so a
+        // moving creep cannot keep the bot permanently outside combat range.
+        const goalY = clamp(ty, 24, 160)
+        const goalX = Math.abs(dy) > 24 ? hx : clamp(tx, -160, 160)
+        const goal = `${goalX},${goalY}`
+        if (botState.lastMoveGoal !== goal && apiCall('_HLW_BrowserHeroMove', 1, goalX, goalY) === 1) {
+          botState.lastMoveGoal = goal
+          return recordBot({ tick: state.tick, kind: 'move', detail: `creep ${target.id} @ ${goal}` })
+        }
+        return recordBot({ tick: state.tick, kind: 'pursue', detail: `creep ${target.id}` })
+      }
+
+      if (state.tick >= state.heroAbilityReady[1] && state.players[1].gold >= 15 &&
+          apiCall('_HLW_BrowserHeroAbility', 1) === 1) {
+        return recordBot({ tick: state.tick, kind: 'ability', detail: `creep ${target.id}` })
+      }
+      if (state.tick >= state.heroReady[1] && apiCall('_HLW_BrowserHeroAttack', 1) === 1) {
+        return recordBot({ tick: state.tick, kind: 'attack', detail: `creep ${target.id}` })
+      }
+      return recordBot({ tick: state.tick, kind: 'hold', detail: `creep ${target.id}` })
+    }
+
+    const ownsActiveCreep = state.creeps.some((creep) => creep.sender === 1)
+    const kind = BOT_SEND_SEQUENCE[botState.sendIndex % BOT_SEND_SEQUENCE.length]
+    if (!ownsActiveCreep && state.players[1].gold >= creepCost(kind) &&
+        apiCall('_TW_BrowserSend', 1, kind) === 1) {
+      botState.sendIndex++
+      return recordBot({ tick: state.tick, kind: 'send', detail: `kind ${kind}` })
+    }
+
+    const [hx, hy] = heroPosition(1)
+    const anchor = [0, 82]
+    if (hx !== anchor[0] || hy !== anchor[1]) {
+      // Stage at the actual lane center. Because native movement is axis-ordered,
+      // finish Y alignment before traversing X; this guarantees the bot reaches a
+      // combat-capable posture during quiet ticks instead of shadowing the lane
+      // from y=140 forever.
+      const goalX = hy !== anchor[1] ? hx : anchor[0]
+      const goalY = anchor[1]
+      const goal = `${goalX},${goalY}`
+      if (botState.lastMoveGoal !== goal && apiCall('_HLW_BrowserHeroMove', 1, goalX, goalY) === 1) {
+        botState.lastMoveGoal = goal
+        return recordBot({ tick: state.tick, kind: 'move', detail: 'defensive lane center' })
+      }
+      return recordBot({ tick: state.tick, kind: 'position', detail: 'defensive lane center' })
+    }
+    return recordBot({ tick: state.tick, kind: 'hold', detail: 'lane clear' })
+  }
+
+  function buildCell(player, x, y, state) {
+    const cell = document.createElement('div')
+    cell.className = 'cell'
+    const path = new Set(state.players[player].path.map(([px, py]) => `${px},${py}`))
+    if (path.has(`${x},${y}`)) cell.classList.add('path')
+    if (x === 0 && y === 3) cell.classList.add('entry')
+    if (x === 8 && y === 3) cell.classList.add('exit')
+
+    const tower = state.players[player].towers.find((tower) => tower.x === x && tower.y === y)
+    if (tower) {
+      const mark = document.createElement('div')
+      mark.className = `tower k${tower.kind}`
+      mark.title = `tower ${tower.id}`
+      cell.appendChild(mark)
+    }
+
+    for (const creep of state.creeps.filter((candidate) => candidate.target === player && candidate.x === x && candidate.y === y)) {
+      const mark = document.createElement('div')
+      mark.className = `creep ${creep.sender === 0 ? 'human-send' : ''}`
+      mark.title = `creep ${creep.id} hp ${creep.hp} progress ${creep.progress}`
+      mark.setAttribute('role', 'img')
+      mark.setAttribute('aria-label', `Creep ${creep.id}, ${creep.hp} HP`)
+      const hp = document.createElement('span')
+      hp.className = 'creep-hp'
+      hp.textContent = `${creep.hp} HP`
+      mark.appendChild(hp)
+      cell.appendChild(mark)
+    }
+
+    if (player === 0) {
+      cell.addEventListener('click', () => {
+        const ok = apiCall('_TW_BrowserBuild', 0, selectedTower, x, y) === 1
+        setMessage(ok ? `built tower at ${x},${y}` : `build rejected at ${x},${y}`, ok)
+        render()
+      })
+    }
+    return cell
+  }
+
+  function renderGrid(player, state) {
+    const grid = byId(`grid${player}`)
+    grid.replaceChildren()
+    for (let y = 0; y < 7; y++) for (let x = 0; x < 9; x++) grid.appendChild(buildCell(player, x, y, state))
+  }
+
+  function render() {
+    if (!globalThis.__TW_READY) return null
+    const state = snap()
+    if (heroMode) {
+      updateCombatPresentation(state)
+      renderEconomy(state)
+      renderLifecycle(state)
+    }
+    if (heroMode) {
+      const hero0 = heroPosition(0)
+      const hero1 = heroPosition(1)
+      byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span><span>LV <b>${state.heroLevel[0]}</b></span><span>XP <b>${state.heroXP[0]}</b></span><span>DMG <b>${state.heroBasicDamage[0]}</b></span><span>POS <b>${hero0[0]},${hero0[1]}</b></span>`
+      byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><span>LV <b>${state.heroLevel[1]}</b></span><span>XP <b>${state.heroXP[1]}</b></span><span>POS <b>${hero1[0]},${hero1[1]}</b></span><b class="enemy">BOT</b>`
+    } else {
+      byId('stats0').innerHTML = `<b class="human">P1</b><span>G <b>${state.players[0].gold}</b></span><span>INC <b>${state.players[0].income}</b></span><span>HP <b>${state.players[0].lives}</b></span>`
+      byId('stats1').innerHTML = `<span>G <b>${state.players[1].gold}</b></span><span>INC <b>${state.players[1].income}</b></span><span>HP <b>${state.players[1].lives}</b></span><b class="enemy">BOT</b>`
+    }
+    byId('clock').textContent = `TICK ${state.tick} · LOG ${state.eventCount} · CREEPS ${state.activeCount}`
+    byId('path0').textContent = `PATH ${state.players[0].pathLength}`
+    byId('path1').textContent = `PATH ${state.players[1].pathLength}`
+    renderGrid(0, state)
+    renderGrid(1, state)
+    if (heroMode && state.terminal && playTimer) stopPlay()
+    return state
+  }
+
+  function reset() {
+    stopPlay()
+    if (heroMode) {
+      resetBot()
+      resetHumanInput()
+      resetCombatPresentation()
+      resetLifecyclePresentation()
+    }
+    const ok = apiCall('_TW_BrowserReset') === 1
+    setMessage(ok ? (heroMode ? 'fresh deterministic local 1v1' : 'fresh deterministic Tower Wars session') : 'reset failed', ok)
+    return render()
+  }
+
+  function heroMove(x, y) {
+    const ok = apiCall('_HLW_BrowserHeroMove', 0, clamp(x, -160, 160), clamp(y, -160, -24)) === 1
+    setMessage(ok ? `hero moving to ${clamp(x, -160, 160)},${clamp(y, -160, -24)}` : 'hero move rejected', ok)
+    render()
+    return ok ? 1 : 0
+  }
+
+  function heroNudge(dx, dy) {
+    const [x, y] = heroPosition(0)
+    return heroMove(x + dx, y + dy)
+  }
+
+  function heroAttack() {
+    const ok = apiCall('_HLW_BrowserHeroAttack', 0) === 1
+    setMessage(ok ? 'basic attack accepted' : 'basic attack rejected', ok)
+    render()
+    return ok ? 1 : 0
+  }
+
+  function heroAbility() {
+    const ok = apiCall('_HLW_BrowserHeroAbility', 0) === 1
+    setMessage(ok ? 'PHASE LANCE accepted' : 'PHASE LANCE rejected', ok)
+    render()
+    return ok ? 1 : 0
+  }
+
+  function playTick() {
+    const before = snap()
+    if (before.terminal) {
+      setMessage('match terminal · reset to play again', false)
+      stopPlay()
+      return 0
+    }
+    if (heroMode) {
+      sampleHumanInput(before)
+      botAct(before)
+    }
+    const stepped = apiCall('_TW_BrowserStep', 1)
+    if (stepped !== 1) {
+      setMessage('authoritative step failed', false)
+      stopPlay()
+      render()
+      return 0
+    }
+    render()
+    return 1
+  }
+
+  function playTicks(count) {
+    for (let i = 0; i < count; i++) {
+      if (playTick() !== 1) return 0
+    }
+    return 1
+  }
+
+  function startPlay() {
+    if (playTimer) return
+    playTimer = setInterval(() => playTick(), 110)
+    setMessage(heroMode ? 'local 1v1 running · deterministic bot active' : 'Tower Wars core running')
+    if (globalThis.__TW_READY && heroMode) renderLifecycle(snap())
+  }
+
+  function stopPlay() {
+    if (playTimer) clearInterval(playTimer)
+    playTimer = null
+    if (globalThis.__TW_READY && heroMode) renderLifecycle(snap())
+  }
+
+  function nativeReplay() {
+    stopPlay()
+    const exportName = typeof Module._HLW_BrowserNativeReplayVerify === 'function'
+      ? '_HLW_BrowserNativeReplayVerify'
+      : '_TW_BrowserReplayVerify'
+    const ok = apiCall(exportName) === 1
+    setMessage(ok ? (heroMode ? 'ordered authoritative + native replay verified' : 'authoritative replay verified') : 'replay divergence', ok)
+    render()
+    return ok ? 1 : 0
+  }
+
+  function replay() {
+    return nativeReplay()
+  }
+
+  globalThis.__TW_BOOT = () => {
+    const coreRequired = [
+      '_TW_BrowserReset', '_TW_BrowserSnapshot', '_TW_BrowserBuild', '_TW_BrowserSend',
+      '_TW_BrowserStep', '_TW_BrowserReplayVerify', '_TW_BrowserCreepCount',
+      '_TW_BrowserCreepCost', '_TW_BrowserCreepIncomeGain', '_TW_BrowserMaxCreeps',
+      '_TW_BrowserOutboundCount', '_TW_BrowserPendingSendCount', '_TW_BrowserOutboundHitPoints',
+    ]
+    if (coreRequired.some((name) => typeof Module[name] !== 'function')) {
+      byId('tw-status').textContent = 'Tower Wars exports missing'
+      byId('tw-status').className = 'bad'
+      return
+    }
+    const heroRequired = [
+      '_HLW_BrowserHeroMove', '_HLW_BrowserHeroAttack', '_HLW_BrowserHeroAbility',
+      '_HLW_BrowserHeroX', '_HLW_BrowserHeroY',
+    ]
+    heroMode = heroRequired.every((name) => typeof Module[name] === 'function')
+    if (Module._TW_BrowserReset() !== 1) {
+      byId('tw-status').textContent = 'authoritative session init failed'
+      byId('tw-status').className = 'bad'
+      return
+    }
+    if (heroMode) resetBot()
+    else byId('bot-status').textContent = 'BOT: H8 unavailable in TW-only build'
+    document.querySelectorAll('.hero-group button').forEach((button) => { button.disabled = !heroMode })
+    globalThis.__TW_READY = true
+    const sharedApi = {
+      snapshot: snap,
+      reset,
+      build: (actor,tower,x,y) => { const result = apiCall('_TW_BrowserBuild',actor,tower,x,y); render(); return result },
+      send: (actor,creep) => { const result = apiCall('_TW_BrowserSend',actor,creep); render(); return result },
+      step: (ticks) => { const result = apiCall('_TW_BrowserStep',ticks); render(); return result },
+      replay,
+      render,
+    }
+    if (heroMode) {
+      Object.assign(sharedApi, {
+        heroPosition,
+        heroMove,
+        heroAttack,
+        heroAbility,
+        botAct,
+        playTick,
+        playTicks,
+        nativeReplay,
+        sendCreep,
+        sampleHumanInput,
+        inputState,
+        botState,
+      })
+      globalThis.__HLW_H8 = { botState }
+      globalThis.__HLW_P1 = { inputState }
+      globalThis.__HLW_P2 = { combatPresentation }
+      globalThis.__HLW_P4 = { lifecyclePresentation, deriveLifecycle, renderLifecycle }
+    } else {
+      delete globalThis.__HLW_H8
+      delete globalThis.__HLW_P1
+      delete globalThis.__HLW_P2
+      delete globalThis.__HLW_P4
+    }
+    globalThis.__TW_API = sharedApi
+    byId('tw-status').textContent = heroMode
+      ? 'OpenRealm WebGL2 alive · human vs deterministic bot ready'
+      : 'OpenRealm WebGL2 alive · authoritative C session ready'
+    byId('tw-status').className = 'ok'
+    render()
+  }
+
+  function blocksGameShortcut(event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return true
+    const target = event.target
+    if (!(target instanceof Element)) return false
+    if (target.closest('input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"])')) return true
+    return false
+  }
+
+  window.addEventListener('keydown', (event) => {
+    if (!heroMode || blocksGameShortcut(event)) return
+    if (!MOVE_KEYS.has(event.code) && !ACTION_KEYS.has(event.code) && !SEND_KEYS.has(event.code)) return
+    event.preventDefault()
+    if (SEND_KEYS.has(event.code)) {
+      if (!event.repeat) sendCreep(SEND_KEYS.get(event.code), 'keyboard')
+      return
+    }
+    if (MOVE_KEYS.has(event.code)) {
+      heldKeys.add(event.code)
+      return
+    }
+    if (event.repeat) return
+    if (event.code === 'Space') inputState.attackQueued = true
+    if (event.code === 'KeyE') inputState.abilityQueued = true
+  })
+  window.addEventListener('keyup', (event) => {
+    if (!MOVE_KEYS.has(event.code)) return
+    // Always release the held movement state even if focus moved while the key
+    // was down, but never consume a keyup owned by an interactive control.
+    heldKeys.delete(event.code)
+    if (blocksGameShortcut(event)) return
+    event.preventDefault()
+  })
+  window.addEventListener('blur', releaseHumanInput)
+
+  document.querySelectorAll('[data-tower]').forEach((button) => button.addEventListener('click', () => {
+    selectedTower = Number(button.dataset.tower)
+    document.querySelectorAll('[data-tower]').forEach((candidate) => candidate.classList.toggle('active', candidate === button))
+  }))
+  document.querySelectorAll('[data-send]').forEach((button) => button.addEventListener('click', () => {
+    sendCreep(Number(button.dataset.send), 'pointer')
+  }))
+  byId('hero-center').addEventListener('click', () => { if (heroMode) { const [x] = heroPosition(0); heroMove(x, -82) } })
+  byId('hero-left').addEventListener('click', () => { if (heroMode) heroNudge(-40, 0) })
+  byId('hero-right').addEventListener('click', () => { if (heroMode) heroNudge(40, 0) })
+  byId('hero-up').addEventListener('click', () => { if (heroMode) heroNudge(0, 22) })
+  byId('hero-down').addEventListener('click', () => { if (heroMode) heroNudge(0, -22) })
+  byId('hero-attack').addEventListener('click', () => { if (heroMode) heroAttack() })
+  byId('hero-ability').addEventListener('click', () => { if (heroMode) heroAbility() })
+  byId('play').addEventListener('click', () => {
+    const state = snap()
+    if (state.terminal) reset()
+    else playTimer ? stopPlay() : startPlay()
+    // Start/Pause/Resume/Restart is the one fallback control that hands focus
+    // back to the game immediately so global gameplay shortcuts remain usable.
+    byId('play')?.blur()
+  })
+  byId('step').addEventListener('click', playTick)
+  byId('step10').addEventListener('click', () => playTicks(10))
+  byId('replay').addEventListener('click', replay)
+  byId('reset').addEventListener('click', reset)
+
+  var Module = {
+    canvas: byId('canvas'),
+    // H8 is an embedded browser control surface. OpenRealm's shipped WC3 config
+    // requests native fullscreen, which promotes the canvas into the browser top
+    // layer and makes sibling DOM controls non-hit-testable. Override only video
+    // presentation policy here; simulation/game authority remains unchanged.
+    arguments: ['-data', '/share', '+set', 'vid_native', '0', '+set', 'vid_fullscreen', '0', '+map', '__wasm_smoke__'],
+    print: (...args) => console.log(...args),
+    printErr: (...args) => console.error(...args),
+    setStatus: () => {},
+    onRuntimeInitialized: () => setTimeout(() => globalThis.__TW_BOOT(), 0),
+    onAbort: (reason) => { byId('tw-status').textContent = `OPENREALM_ABORT=${reason}`; byId('tw-status').className='bad' }
+  }
+</script>
+<script async type="text/javascript" src="openrealm.js"></script>
+</body>
+</html>
