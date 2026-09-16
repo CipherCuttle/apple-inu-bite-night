@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import './style.css'
-import { GameScene } from './game/scenes/GameScene'
+import { BeanGameScene } from './game/scenes/BeanGameScene'
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -15,5 +15,5 @@ new Phaser.Game({
     width: 960,
     height: 540,
   },
-  scene: [GameScene],
+  scene: [BeanGameScene],
 })
