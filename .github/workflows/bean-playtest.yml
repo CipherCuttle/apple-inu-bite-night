@@ -63,7 +63,9 @@ jobs:
           if [[ "$GITHUB_REF" == refs/heads/experiment/graphics-stack-* ]]; then
             pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=4300 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=A&autotest=1' graphics-stack-a.png
             pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=4300 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=B&autotest=1' graphics-stack-b.png
-            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=5200 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=C&autotest=1' graphics-stack-c.png
+            # Rapier's WASM-backed compat module initializes after the page loads; give C a slightly later
+            # capture window so its single deterministic blast is represented fairly against B.
+            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=6500 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=C&autotest=1' graphics-stack-c.png
           fi
 
       - name: Write playtest receipt
