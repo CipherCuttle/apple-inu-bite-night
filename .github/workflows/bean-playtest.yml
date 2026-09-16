@@ -5,9 +5,6 @@ on:
     branches:
       - resurrect/bean-combat-v0
       - 'experiment/bean-*'
-  pull_request:
-    branches:
-      - phase-3/soulslike-stamina-dodge-v0
 
 permissions:
   contents: write
@@ -77,7 +74,7 @@ jobs:
           fi
 
       - name: Publish stable Bean preview branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/resurrect/bean-combat-v0'
+        if: github.ref == 'refs/heads/resurrect/bean-combat-v0'
         run: |
           cp -R dist /tmp/bean-tested-dist
           git config user.name "github-actions[bot]"
