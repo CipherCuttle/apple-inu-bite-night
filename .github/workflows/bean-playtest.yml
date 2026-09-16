@@ -5,6 +5,7 @@ on:
     branches:
       - resurrect/bean-combat-v0
       - 'experiment/bean-*'
+      - 'spike/pixi-bean-*'
 
 permissions:
   contents: write
@@ -39,17 +40,22 @@ jobs:
           echo $! > /tmp/bean-preview.pid
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
-              exit 0
+              break
             fi
             sleep 0.5
           done
-          cat /tmp/bean-preview.log
-          exit 1
+          curl -fsS http://127.0.0.1:4173/ >/dev/null
+          if [[ "$GITHUB_REF" == refs/heads/spike/pixi-bean-* ]]; then
+            curl -fsS http://127.0.0.1:4173/pixi-spike.html >/dev/null
+          fi
 
-      - name: Capture boot screenshot
+      - name: Capture browser comparison
         run: |
           pnpm dlx playwright@1.55.0 install --with-deps chromium
-          pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=2500 http://127.0.0.1:4173/ bean-boot.png
+          pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=2500 http://127.0.0.1:4173/ bean-phaser-baseline.png
+          if [[ "$GITHUB_REF" == refs/heads/spike/pixi-bean-* ]]; then
+            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=3500 http://127.0.0.1:4173/pixi-spike.html bean-pixi-spike.png
+          fi
 
       - name: Write playtest receipt
         run: |
@@ -60,7 +66,8 @@ jobs:
         with:
           name: bean-playtest-${{ github.sha }}
           path: |
-            bean-boot.png
+            bean-phaser-baseline.png
+            bean-pixi-spike.png
             PLAYTEST_RECEIPT.txt
             dist
           if-no-files-found: error
@@ -87,3 +94,18 @@ jobs:
           git add -A
           git commit -m "preview(bean): ${GITHUB_SHA}"
           git push --force origin HEAD:preview-bean
+
+      - name: Publish stable Pixi bake-off preview branch
+        if: startsWith(github.ref, 'refs/heads/spike/pixi-bean-')
+        run: |
+          cp -R dist /tmp/bean-pixi-tested-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-pixi-bean
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R /tmp/bean-pixi-tested-dist/. .
+          touch .nojekyll
+          printf '%s\n' "$GITHUB_SHA" > BUILD_SHA
+          git add -A
+          git commit -m "preview(pixi-bean): ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-pixi-bean
