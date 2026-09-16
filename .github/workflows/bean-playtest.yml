@@ -6,6 +6,7 @@ on:
       - resurrect/bean-combat-v0
       - 'experiment/bean-*'
       - 'spike/pixi-bean-*'
+      - 'experiment/graphics-stack-*'
 
 permissions:
   contents: write
@@ -48,6 +49,9 @@ jobs:
           if [[ "$GITHUB_REF" == refs/heads/spike/pixi-bean-* ]]; then
             curl -fsS http://127.0.0.1:4173/pixi-spike.html >/dev/null
           fi
+          if [[ "$GITHUB_REF" == refs/heads/experiment/graphics-stack-* ]]; then
+            curl -fsS http://127.0.0.1:4173/graphics-bakeoff.html >/dev/null
+          fi
 
       - name: Capture browser comparison
         run: |
@@ -55,6 +59,11 @@ jobs:
           pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=2500 http://127.0.0.1:4173/ bean-phaser-baseline.png
           if [[ "$GITHUB_REF" == refs/heads/spike/pixi-bean-* ]]; then
             pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=3500 http://127.0.0.1:4173/pixi-spike.html bean-pixi-spike.png
+          fi
+          if [[ "$GITHUB_REF" == refs/heads/experiment/graphics-stack-* ]]; then
+            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=4300 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=A&autotest=1' graphics-stack-a.png
+            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=4300 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=B&autotest=1' graphics-stack-b.png
+            pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=5200 'http://127.0.0.1:4173/graphics-bakeoff.html?mode=C&autotest=1' graphics-stack-c.png
           fi
 
       - name: Write playtest receipt
@@ -68,6 +77,9 @@ jobs:
           path: |
             bean-phaser-baseline.png
             bean-pixi-spike.png
+            graphics-stack-a.png
+            graphics-stack-b.png
+            graphics-stack-c.png
             PLAYTEST_RECEIPT.txt
             dist
           if-no-files-found: error
@@ -109,3 +121,18 @@ jobs:
           git add -A
           git commit -m "preview(pixi-bean): ${GITHUB_SHA}"
           git push --force origin HEAD:preview-pixi-bean
+
+      - name: Publish stable graphics-stack preview branch
+        if: startsWith(github.ref, 'refs/heads/experiment/graphics-stack-')
+        run: |
+          cp -R dist /tmp/graphics-stack-tested-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-graphics-stack
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R /tmp/graphics-stack-tested-dist/. .
+          touch .nojekyll
+          printf '%s\n' "$GITHUB_SHA" > BUILD_SHA
+          git add -A
+          git commit -m "preview(graphics-stack): ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-graphics-stack
