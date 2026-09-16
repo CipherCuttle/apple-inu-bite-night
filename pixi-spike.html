@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bean // Pixi Visual Spike</title>
+    <style>
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05040a;
+        color: #efe9ff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      body {
+        display: grid;
+        place-items: center;
+      }
+      #frame {
+        width: min(100vw, 177.77vh);
+        aspect-ratio: 16 / 9;
+        position: relative;
+        background: #05040a;
+        box-shadow: 0 0 80px rgba(93, 54, 171, 0.28);
+      }
+      #stage, #stage canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+      #hint {
+        position: absolute;
+        left: 18px;
+        bottom: 16px;
+        z-index: 3;
+        padding: 8px 10px;
+        border: 1px solid rgba(190, 164, 255, 0.22);
+        background: rgba(7, 5, 12, 0.72);
+        color: #bcaaff;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="frame">
+      <div id="stage"></div>
+      <div id="hint">WASD MOVE · MOUSE AIM · LMB SLASH · VISUAL SPIKE ONLY</div>
+    </div>
+    <script type="module" src="./pixi-spike.js"></script>
+  </body>
+</html>
