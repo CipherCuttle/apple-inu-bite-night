@@ -2,7 +2,7 @@
 
 ## Intent
 
-Resurrect the pre-Hero-Line-Wars top-down combat game and make `@BeanOnInk` the player identity without importing tower-defense / Hero Line Wars gameplay into the fighter.
+Resurrect the pre-Hero-Line-Wars top-down combat game and make Bean the player identity without importing tower-defense / Hero Line Wars gameplay into the fighter.
 
 ## Authority
 
@@ -22,24 +22,22 @@ Bean V0 is presentation-only. It must not change combat geometry, damage, stamin
 
 ## Bean presentation V0
 
-`BeanGameScene` subclasses the preserved fighter scene, calls the original `create()`, then replaces only the visible Apple Inu player children while retaining the original player container used by simulation/render synchronization.
+`BeanGameScene` subclasses the preserved fighter scene, calls the original `create()`, then replaces only the visible player children while retaining the original player container used by simulation/render synchronization.
 
-The current `@BeanOnInk` X avatar is loaded from the public profile CDN as the temporary canonical visual reference:
+The owner-supplied visual reference defines the canonical direction: warm yellow/orange bean, thick near-black outline, tiny face, blue-and-white cap, oversized white `BEAN` shirt, blue accents, chunky low-resolution/Y2K web-game energy.
 
-`https://x.com/BeanOnInk`
+The runtime Bean is now generated entirely from local Phaser primitives and the inherited weapon asset. There is no X/PBS runtime dependency.
 
-A simple local vector Bean fallback is rendered if the remote avatar fails to load, so CDN/network failure does not block gameplay.
-
-The inherited sword asset is intentionally retained for this first resurrection proof. Weapon redesign is a separate art/combat-feel decision and is not bundled into the identity swap.
-
-## Known debt
-
-The X/PBS avatar is a runtime network dependency. This is acceptable only for the resurrection proof. The next art pass should vendor approved full-body Bean artwork into `public/assets/characters/bean-on-ink/` and remove the external dependency.
+The inherited sword asset is intentionally retained for this first resurrection proof. Weapon redesign is a separate combat-feel/art experiment.
 
 ## Acceptance
 
 - game boots into the old top-down fighter, not Hero Line Wars / tower defense;
-- the visible protagonist is BeanOnInk (or the Bean fallback if the CDN is unavailable);
+- visible protagonist reads as Bean in the owner-approved cheap-web/Y2K aesthetic;
 - WASD, aim, slash, dash, whirlwind, stab and dodge still operate through the inherited combat scene;
-- the existing test suite and determinism regression remain unchanged and pass;
+- existing test suite and determinism regression remain unchanged and pass;
 - no tower-defense or HLW module becomes a dependency of this branch.
+
+## Next evidence
+
+Use `PROMPT_TO_PLAYABLE_V1.md` and the `bean-playtest` workflow to create short, isolated taste experiments. The human playtest verdict remains the authority on fun.

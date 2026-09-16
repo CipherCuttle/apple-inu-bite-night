@@ -1,0 +1,92 @@
+name: bean-playtest
+
+on:
+  push:
+    branches:
+      - resurrect/bean-combat-v0
+      - 'experiment/bean-*'
+  pull_request:
+    branches:
+      - phase-3/soulslike-stamina-dodge-v0
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bean-playtest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-capture-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:determinism
+
+      - name: Start tested browser build
+        run: |
+          python3 -m http.server 4173 --directory dist > /tmp/bean-preview.log 2>&1 &
+          echo $! > /tmp/bean-preview.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/bean-preview.log
+          exit 1
+
+      - name: Capture boot screenshot
+        run: |
+          pnpm dlx playwright@1.55.0 install --with-deps chromium
+          pnpm dlx playwright@1.55.0 screenshot --wait-for-timeout=2500 http://127.0.0.1:4173/ bean-boot.png
+
+      - name: Write playtest receipt
+        run: |
+          printf 'commit=%s\nref=%s\nworkflow=%s\n' "$GITHUB_SHA" "$GITHUB_REF" "$GITHUB_RUN_ID" > PLAYTEST_RECEIPT.txt
+
+      - name: Upload tested playtest artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bean-playtest-${{ github.sha }}
+          path: |
+            bean-boot.png
+            PLAYTEST_RECEIPT.txt
+            dist
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop local preview server
+        if: always()
+        run: |
+          if [ -f /tmp/bean-preview.pid ]; then
+            kill "$(cat /tmp/bean-preview.pid)" || true
+          fi
+
+      - name: Publish stable Bean preview branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/resurrect/bean-combat-v0'
+        run: |
+          cp -R dist /tmp/bean-tested-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-bean
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R /tmp/bean-tested-dist/. .
+          touch .nojekyll
+          printf '%s\n' "$GITHUB_SHA" > BUILD_SHA
+          git add -A
+          git commit -m "preview(bean): ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-bean
