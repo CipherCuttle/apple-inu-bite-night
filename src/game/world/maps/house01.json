@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "name": "Maple Street House 01",
+  "width": 18,
+  "height": 14,
+  "spawn": { "x": 8.5, "y": 10.5 },
+  "houseBounds": { "x": 4, "y": 2, "w": 10, "h": 8 },
+  "road": { "x": 0, "y": 12, "w": 18, "h": 2 },
+  "sidewalk": { "x": 0, "y": 11, "w": 18, "h": 1 },
+  "driveway": { "x": 12, "y": 9, "w": 3, "h": 3 },
+  "rooms": [
+    { "id": "kitchen", "x": 5, "y": 3, "w": 3, "h": 2, "floor": "tile" },
+    { "id": "bathroom", "x": 9, "y": 3, "w": 4, "h": 2, "floor": "tile" },
+    { "id": "living", "x": 5, "y": 6, "w": 3, "h": 3, "floor": "wood" },
+    { "id": "hall", "x": 8, "y": 6, "w": 1, "h": 3, "floor": "wood" },
+    { "id": "bedroom", "x": 9, "y": 6, "w": 4, "h": 3, "floor": "carpet" }
+  ],
+  "walls": [
+    { "x": 4, "y": 2, "kind": "exterior" }, { "x": 5, "y": 2, "kind": "exterior" }, { "x": 6, "y": 2, "kind": "exterior" }, { "x": 7, "y": 2, "kind": "exterior" }, { "x": 8, "y": 2, "kind": "exterior" }, { "x": 9, "y": 2, "kind": "exterior" }, { "x": 10, "y": 2, "kind": "exterior" }, { "x": 11, "y": 2, "kind": "exterior" }, { "x": 12, "y": 2, "kind": "exterior" }, { "x": 13, "y": 2, "kind": "exterior" },
+    { "x": 4, "y": 3, "kind": "exterior" }, { "x": 13, "y": 3, "kind": "exterior" },
+    { "x": 4, "y": 4, "kind": "exterior" }, { "x": 13, "y": 4, "kind": "exterior" },
+    { "x": 4, "y": 5, "kind": "exterior" }, { "x": 13, "y": 5, "kind": "exterior" },
+    { "x": 4, "y": 6, "kind": "exterior" }, { "x": 13, "y": 6, "kind": "exterior" },
+    { "x": 4, "y": 7, "kind": "exterior" }, { "x": 13, "y": 7, "kind": "exterior" },
+    { "x": 4, "y": 8, "kind": "exterior" }, { "x": 13, "y": 8, "kind": "exterior" },
+    { "x": 4, "y": 9, "kind": "exterior" }, { "x": 5, "y": 9, "kind": "exterior" }, { "x": 6, "y": 9, "kind": "exterior" }, { "x": 7, "y": 9, "kind": "exterior" }, { "x": 9, "y": 9, "kind": "exterior" }, { "x": 10, "y": 9, "kind": "exterior" }, { "x": 11, "y": 9, "kind": "exterior" }, { "x": 12, "y": 9, "kind": "exterior" }, { "x": 13, "y": 9, "kind": "exterior" },
+    { "x": 8, "y": 3, "kind": "interior" }, { "x": 8, "y": 4, "kind": "interior" }, { "x": 8, "y": 5, "kind": "interior" },
+    { "x": 8, "y": 7, "kind": "interior" }, { "x": 8, "y": 8, "kind": "interior" },
+    { "x": 9, "y": 5, "kind": "interior" }, { "x": 11, "y": 5, "kind": "interior" }, { "x": 12, "y": 5, "kind": "interior" }
+  ],
+  "openings": [
+    { "id": "front-door", "kind": "door", "x": 8, "y": 9, "orientation": "south", "open": false },
+    { "id": "bath-door", "kind": "door", "x": 10, "y": 5, "orientation": "south", "open": true },
+    { "id": "kitchen-window", "kind": "window", "x": 6, "y": 2, "orientation": "north" },
+    { "id": "bath-window", "kind": "window", "x": 11, "y": 2, "orientation": "north" },
+    { "id": "living-window", "kind": "window", "x": 4, "y": 7, "orientation": "west" },
+    { "id": "bedroom-window", "kind": "window", "x": 13, "y": 7, "orientation": "east" }
+  ],
+  "objects": [
+    { "id": "fridge", "sprite": "fridge", "x": 5.3, "y": 3.25, "container": "fridge", "loot": ["Water Bottle", "Canned Beans", "Orange Soda"] },
+    { "id": "counter-a", "sprite": "counter", "x": 6.25, "y": 3.2, "container": "kitchen counter", "loot": ["Kitchen Knife", "Can Opener", "Garbage Bag"] },
+    { "id": "sink-kitchen", "sprite": "sink", "x": 7.2, "y": 3.25 },
+    { "id": "table", "sprite": "table", "x": 6.35, "y": 4.25 },
+    { "id": "chair-a", "sprite": "chair", "x": 5.8, "y": 4.55 },
+    { "id": "chair-b", "sprite": "chair", "x": 6.85, "y": 4.0 },
+    { "id": "toilet", "sprite": "toilet", "x": 9.6, "y": 3.45 },
+    { "id": "bath-sink", "sprite": "sink", "x": 10.65, "y": 3.35, "container": "medicine cabinet", "loot": ["Bandage", "Painkillers"] },
+    { "id": "bathtub", "sprite": "bathtub", "x": 12.0, "y": 3.7 },
+    { "id": "sofa", "sprite": "sofa", "x": 5.65, "y": 7.0 },
+    { "id": "coffee-table", "sprite": "coffee-table", "x": 6.65, "y": 7.45 },
+    { "id": "tv", "sprite": "tv", "x": 7.3, "y": 6.35 },
+    { "id": "bookshelf", "sprite": "bookshelf", "x": 5.25, "y": 8.15, "container": "bookshelf", "loot": ["Magazine", "Maple Street Map"] },
+    { "id": "bed", "sprite": "bed", "x": 10.1, "y": 7.0 },
+    { "id": "nightstand", "sprite": "nightstand", "x": 11.55, "y": 6.6, "container": "nightstand", "loot": ["Flashlight", "Battery"] },
+    { "id": "dresser", "sprite": "dresser", "x": 12.25, "y": 8.0, "container": "dresser", "loot": ["T-Shirt", "School Backpack"] },
+    { "id": "mailbox", "sprite": "mailbox", "x": 7.4, "y": 10.7 },
+    { "id": "shrub-a", "sprite": "shrub", "x": 4.0, "y": 10.3 },
+    { "id": "shrub-b", "sprite": "shrub", "x": 11.0, "y": 10.3 },
+    { "id": "car", "sprite": "car", "x": 14.2, "y": 12.55 },
+    { "id": "trash", "sprite": "trash", "x": 13.2, "y": 10.2 }
+  ],
+  "roof": { "x": 4, "y": 2, "w": 10, "h": 8, "tile": "roof", "ridgeY": 5 }
+}

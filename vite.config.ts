@@ -15,6 +15,7 @@ export default defineConfig({
         apocalypseV3: 'apocalypse-v3.html',
         pzSurvival: 'pz-survival.html',
         pzSurvivalV1: 'pz-survival-v1.html',
+        pzHouseArt: 'pz-house-art.html',
       },
     },
   },
