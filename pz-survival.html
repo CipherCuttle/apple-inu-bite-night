@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0e0c" />
+    <title>LAST BLOCK // SURVIVAL V0</title>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <header class="topbar">
+      <div><strong>LAST BLOCK</strong><span> SURVIVAL V0</span></div>
+      <div class="clock"><span id="day-label">DAY 1</span><strong id="time-label">08:00</strong></div>
+      <div class="status" id="status-label">QUIET</div>
+    </header>
+    <aside class="survival-panel">
+      <div class="panel-title">SURVIVOR</div>
+      <div class="meter-row"><span>HP</span><div><i id="hp-bar"></i></div><b id="hp-value">100</b></div>
+      <div class="meter-row"><span>HUNGER</span><div><i id="hunger-bar"></i></div><b id="hunger-value">8</b></div>
+      <div class="meter-row"><span>THIRST</span><div><i id="thirst-bar"></i></div><b id="thirst-value">10</b></div>
+      <div class="meter-row"><span>FATIGUE</span><div><i id="fatigue-bar"></i></div><b id="fatigue-value">6</b></div>
+      <div class="meter-row danger"><span>BLEED</span><div><i id="bleed-bar"></i></div><b id="bleed-value">0</b></div>
+      <div class="meter-row danger"><span>PAIN</span><div><i id="pain-bar"></i></div><b id="pain-value">0</b></div>
+      <div class="panel-title inventory-title">INVENTORY <small id="weight-label">0 / 8 kg</small></div>
+      <div id="inventory-list" class="item-list"></div>
+      <button id="bandage-button" class="utility-button" type="button">BANDAGE WOUND</button>
+      <div class="panel-title loot-title">NEARBY CONTAINER</div>
+      <div id="loot-name" class="loot-name">NONE</div>
+      <div id="loot-list" class="item-list loot-list"></div>
+      <div class="save-row">
+        <button id="save-button" type="button">SAVE</button>
+        <button id="load-button" type="button">LOAD</button>
+        <button id="new-button" type="button">NEW</button>
+      </div>
+    </aside>
+    <div id="interaction-prompt" class="interaction-prompt">MOVE AROUND. FIND FOOD. STAY QUIET.</div>
+    <div id="event-feed" class="event-feed"></div>
+    <div class="controls">WASD MOVE · SHIFT SPRINT · E INTERACT · F SMASH WINDOW · SPACE KNIFE · B BANDAGE · MOUSE WHEEL ZOOM</div>
+    <div id="death-screen" class="death-screen hidden">
+      <div class="death-kicker">SURVIVOR LOST</div>
+      <h1>THE BLOCK KEEPS GOING.</h1>
+      <p>Your save still exists. Load it, or start another survivor.</p>
+      <button id="death-load" type="button">LOAD LAST SAVE</button>
+      <button id="death-new" type="button">NEW SURVIVOR</button>
+    </div>
+    <div id="boot-status" class="boot-status">BUILDING NEIGHBORHOOD…</div>
+    <script type="module" src="/src/pz-survival.ts"></script>
+  </body>
+</html>
