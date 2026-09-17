@@ -1,0 +1,90 @@
+name: apocalypse-playable
+
+on:
+  push:
+    branches:
+      - 'experiment/apocalypse-playable-*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apocalypse-playable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-capture-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:determinism
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Verify escrow contract
+        run: forge test -q
+
+      - name: Start tested browser build
+        run: |
+          python3 -m http.server 4173 --directory dist > /tmp/apocalypse-preview.log 2>&1 &
+          echo $! > /tmp/apocalypse-preview.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:4173/ >/dev/null
+
+      - name: Capture actual playable
+        run: |
+          pnpm dlx playwright@1.55.0 install --with-deps chromium
+          pnpm dlx playwright@1.55.0 screenshot \
+            --viewport-size=1280,720 \
+            --wait-for-timeout=6000 \
+            'http://127.0.0.1:4173/?autotest=1' \
+            apocalypse-playable-v1.png
+
+      - name: Upload playtest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apocalypse-playable-${{ github.sha }}
+          path: |
+            apocalypse-playable-v1.png
+            dist
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop local preview server
+        if: always()
+        run: |
+          if [ -f /tmp/apocalypse-preview.pid ]; then
+            kill "$(cat /tmp/apocalypse-preview.pid)" || true
+          fi
+
+      - name: Publish stable GitHack branch
+        run: |
+          cp -R dist /tmp/apocalypse-tested-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-apocalypse-playable
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R /tmp/apocalypse-tested-dist/. .
+          touch .nojekyll
+          printf '%s\n' "$GITHUB_SHA" > BUILD_SHA
+          git add -A
+          git commit -m "preview(apocalypse-playable): ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-apocalypse-playable
