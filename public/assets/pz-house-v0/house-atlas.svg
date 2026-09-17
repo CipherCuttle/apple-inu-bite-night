@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="576" height="576" viewBox="0 0 576 576">
+  <defs>
+    <linearGradient id="wood" x1="0" x2="1"><stop stop-color="#8d6c4c"/><stop offset="1" stop-color="#6d4f38"/></linearGradient>
+    <linearGradient id="roof" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#88483d"/><stop offset="1" stop-color="#5a2d2b"/></linearGradient>
+    <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#d9ddd6"/><stop offset="1" stop-color="#9aa39d"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="2" flood-opacity=".28"/></filter>
+    <style>.o{stroke:#2a241f;stroke-width:2}.s{stroke:#4a4036;stroke-width:1.5}.hi{stroke:#f3eadb;stroke-opacity:.35;stroke-width:1}</style>
+  </defs>
+
+  <!-- 0 grass -->
+  <g transform="translate(0 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#627a50"/><path d="M26 42l6-4m18 9l8-6m-12-8l4-5m15 15l5-3" stroke="#809365" stroke-width="1.4" opacity=".8"/></g>
+  <!-- 1 road -->
+  <g transform="translate(96 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#565b5a"/><path d="M23 41l50 0" stroke="#6c716f" stroke-width="1" opacity=".45"/><circle cx="34" cy="39" r="1" fill="#313535"/><circle cx="61" cy="46" r="1.2" fill="#303434"/></g>
+  <!-- 2 sidewalk -->
+  <g transform="translate(192 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#a5a59c"/><path d="M48 25v33M31 33l34 17" stroke="#74766f" stroke-width="1" opacity=".6"/></g>
+  <!-- 3 wood floor -->
+  <g transform="translate(288 0)"><polygon points="48,24 82,41 48,58 14,41" fill="url(#wood)"/><path d="M27 34l40 20m-31-25l40 20m-51-10l40 20" stroke="#b18a63" stroke-width="1" opacity=".42"/></g>
+  <!-- 4 tile floor -->
+  <g transform="translate(384 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#c9c6ba"/><path d="M31 33l34 17M48 25v33" stroke="#9b9a90" stroke-width="1"/></g>
+  <!-- 5 carpet -->
+  <g transform="translate(480 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#6f776d"/><path d="M25 40l23-11 23 11-23 12z" fill="none" stroke="#879087" stroke-width="1" opacity=".65"/></g>
+
+  <!-- 6 exterior wall -->
+  <g transform="translate(0 96)" filter="url(#shadow)"><polygon points="18,69 48,84 78,69 48,54" fill="#c6b798" class="o"/><polygon points="18,69 48,84 48,35 18,20" fill="#766958" class="o"/><polygon points="78,69 48,84 48,35 78,20" fill="#998970" class="o"/><path d="M23 31l20 10m-20 7l20 10M73 31L53 41m20 7L53 58" class="hi"/></g>
+  <!-- 7 interior wall -->
+  <g transform="translate(96 96)" filter="url(#shadow)"><polygon points="18,69 48,84 78,69 48,54" fill="#d7d0c2" class="o"/><polygon points="18,69 48,84 48,35 18,20" fill="#8b8376" class="o"/><polygon points="78,69 48,84 48,35 78,20" fill="#aaa194" class="o"/><path d="M24 34l19 9m-19 8l19 9" class="hi"/></g>
+  <!-- 8 roof -->
+  <g transform="translate(192 96)" filter="url(#shadow)"><polygon points="48,12 87,35 48,60 9,35" fill="url(#roof)" class="o"/><path d="M18 35l30-17 30 17M25 39l23-13 23 13M32 43l16-9 16 9" stroke="#ad685b" stroke-width="1.2" opacity=".6"/></g>
+  <!-- 9 ridge -->
+  <g transform="translate(288 96)"><polygon points="18,44 48,28 78,44 48,60" fill="#4b2926" class="o"/><path d="M25 44l23-12 23 12" stroke="#b56d60" stroke-width="2"/></g>
+  <!-- 10 door closed -->
+  <g transform="translate(384 96)" filter="url(#shadow)"><polygon points="25,73 48,84 71,73 48,62" fill="#6a533c" class="o"/><polygon points="29,65 48,74 48,28 29,19" fill="#7a5436" class="o"/><polygon points="67,65 48,74 48,28 67,19" fill="#9a6b44" class="o"/><circle cx="58" cy="48" r="2" fill="#d6ba69"/></g>
+  <!-- 11 door open -->
+  <g transform="translate(480 96)" filter="url(#shadow)"><polygon points="23,72 48,84 74,72 48,60" fill="#5d4938" class="o"/><polygon points="52,63 70,70 70,26 52,19" fill="#8b603d" class="o"/><path d="M30 67l20-10" stroke="#2c251f" stroke-width="3"/></g>
+
+  <!-- 12 window -->
+  <g transform="translate(0 192)" filter="url(#shadow)"><polygon points="18,70 48,84 78,70 48,56" fill="#6b5f50" class="o"/><polygon points="26,62 48,72 48,36 26,26" fill="#5f868d" class="o"/><polygon points="70,62 48,72 48,36 70,26" fill="#7da7aa" class="o"/><path d="M48 38v32M30 48l18 9m18-9l-18 9" stroke="#d9f3ef" stroke-width="1.5" opacity=".85"/></g>
+  <!-- 13 fridge -->
+  <g transform="translate(96 192)" filter="url(#shadow)"><polygon points="26,72 48,83 70,72 48,61" fill="#aeb4ad" class="o"/><polygon points="29,62 48,71 48,23 29,14" fill="#cfd3cd" class="o"/><polygon points="67,62 48,71 48,23 67,14" fill="url(#metal)" class="o"/><path d="M50 41l13-6M50 46l13-6" stroke="#707872" stroke-width="1"/><circle cx="61" cy="31" r="1.7" fill="#4f5652"/></g>
+  <!-- 14 counter -->
+  <g transform="translate(192 192)" filter="url(#shadow)"><polygon points="18,66 48,82 79,66 48,51" fill="#b1885e" class="o"/><polygon points="18,66 48,82 48,52 18,37" fill="#6e533a" class="o"/><polygon points="79,66 48,82 48,52 79,37" fill="#8d6b49" class="o"/><polygon points="18,37 48,52 79,37 48,22" fill="#d4c0a1" class="o"/></g>
+  <!-- 15 sink -->
+  <g transform="translate(288 192)" filter="url(#shadow)"><polygon points="18,67 48,82 78,67 48,52" fill="#9a8771" class="o"/><polygon points="18,67 48,82 48,52 18,38" fill="#6f5d4c" class="o"/><polygon points="78,67 48,82 48,52 78,38" fill="#816c57" class="o"/><polygon points="18,38 48,53 78,38 48,23" fill="#d4d5cf" class="o"/><ellipse cx="48" cy="39" rx="11" ry="6" fill="#879b9b"/><path d="M47 31c0-8 8-8 8-2" stroke="#bfc9c6" stroke-width="3" fill="none"/></g>
+  <!-- 16 table -->
+  <g transform="translate(384 192)" filter="url(#shadow)"><polygon points="14,45 48,62 82,45 48,28" fill="#8f6848" class="o"/><path d="M20 47v23m56-23v23M44 61v22m8-22v22" stroke="#503b2c" stroke-width="4"/></g>
+  <!-- 17 chair -->
+  <g transform="translate(480 192)" filter="url(#shadow)"><polygon points="31,52 48,61 65,52 48,43" fill="#79583d" class="o"/><path d="M34 53v24m28-24v24M36 44V27m24 17V27m-24 1l12 6 12-6" stroke="#4c3828" stroke-width="3" fill="none"/></g>
+
+  <!-- 18 sofa -->
+  <g transform="translate(0 288)" filter="url(#shadow)"><polygon points="13,57 48,75 83,57 48,39" fill="#5e6d63" class="o"/><polygon points="18,48 48,63 78,48 78,31 48,46 18,31" fill="#76887b" class="o"/><path d="M48 46v17" class="s"/></g>
+  <!-- 19 coffee table -->
+  <g transform="translate(96 288)" filter="url(#shadow)"><polygon points="20,48 48,62 76,48 48,34" fill="#7a573f" class="o"/><path d="M25 50v20m46-20v20" stroke="#443229" stroke-width="3"/></g>
+  <!-- 20 tv -->
+  <g transform="translate(192 288)" filter="url(#shadow)"><polygon points="20,65 48,79 76,65 48,51" fill="#4c4238" class="o"/><polygon points="26,50 48,61 70,50 70,24 48,35 26,24" fill="#1d2324" class="o"/><polygon points="30,45 48,54 66,45 66,29 48,38 30,29" fill="#39575e"/><path d="M48 60v8" stroke="#262321" stroke-width="4"/></g>
+  <!-- 21 bed -->
+  <g transform="translate(288 288)" filter="url(#shadow)"><polygon points="12,58 48,77 84,58 48,39" fill="#7c654f" class="o"/><polygon points="16,51 48,67 80,51 48,35" fill="#b7b1a6" class="o"/><polygon points="48,35 80,51 80,39 48,23" fill="#d4cec2" class="o"/><rect x="31" y="40" width="12" height="8" rx="2" transform="rotate(27 37 44)" fill="#e6e1d8"/></g>
+  <!-- 22 dresser -->
+  <g transform="translate(384 288)" filter="url(#shadow)"><polygon points="22,67 48,80 74,67 48,54" fill="#6b4e39" class="o"/><polygon points="25,58 48,70 48,31 25,20" fill="#74543b" class="o"/><polygon points="71,58 48,70 48,31 71,20" fill="#8b6545" class="o"/><path d="M51 40l17-8M51 50l17-8M51 60l17-8" stroke="#4c3728" stroke-width="1.5"/></g>
+  <!-- 23 nightstand -->
+  <g transform="translate(480 288)" filter="url(#shadow)"><polygon points="29,62 48,72 67,62 48,52" fill="#6b503d" class="o"/><polygon points="31,55 48,64 48,39 31,31" fill="#795a43" class="o"/><polygon points="65,55 48,64 48,39 65,31" fill="#916c4f" class="o"/><circle cx="59" cy="47" r="1.5" fill="#d1b46a"/></g>
+
+  <!-- 24 toilet -->
+  <g transform="translate(0 384)" filter="url(#shadow)"><ellipse cx="48" cy="57" rx="20" ry="12" fill="#d8ddd8" class="o"/><ellipse cx="48" cy="52" rx="13" ry="8" fill="#8ea4a2"/><rect x="38" y="25" width="20" height="25" rx="3" fill="#e7e9e4" class="o"/></g>
+  <!-- 25 bathtub -->
+  <g transform="translate(96 384)" filter="url(#shadow)"><polygon points="13,54 48,72 83,54 48,36" fill="#d9dedc" class="o"/><polygon points="22,53 48,66 74,53 48,40" fill="#9bb1b4"/><path d="M73 39v10" stroke="#9aa7a5" stroke-width="3"/></g>
+  <!-- 26 medicine -->
+  <g transform="translate(192 384)" filter="url(#shadow)"><polygon points="29,62 48,72 67,62 48,52" fill="#d5d6cf" class="o"/><polygon points="31,54 48,63 48,29 31,20" fill="#e6e7df" class="o"/><polygon points="65,54 48,63 48,29 65,20" fill="#c9ccc5" class="o"/><path d="M54 38h7m-3.5-3.5v7" stroke="#8e3d3d" stroke-width="3"/></g>
+  <!-- 27 bookshelf -->
+  <g transform="translate(288 384)" filter="url(#shadow)"><polygon points="24,68 48,80 72,68 48,56" fill="#5a4635" class="o"/><polygon points="27,59 48,70 48,22 27,12" fill="#6b503a" class="o"/><polygon points="69,59 48,70 48,22 69,12" fill="#7d5e42" class="o"/><path d="M51 33l15-7M51 45l15-7M51 57l15-7" stroke="#c3995d" stroke-width="2"/><path d="M54 29v8m5-11v8m5-10v8M54 41v8m5-11v8m5-10v8" stroke="#526a73" stroke-width="2"/></g>
+  <!-- 28 shrub -->
+  <g transform="translate(384 384)" filter="url(#shadow)"><ellipse cx="48" cy="67" rx="27" ry="11" fill="#2d3c28"/><circle cx="36" cy="49" r="18" fill="#4e6f46"/><circle cx="54" cy="43" r="20" fill="#5d8050"/><circle cx="65" cy="54" r="15" fill="#46653f"/></g>
+  <!-- 29 mailbox -->
+  <g transform="translate(480 384)" filter="url(#shadow)"><path d="M35 67V38h23c8 0 12 5 12 11v9H35z" fill="#506579" class="o"/><path d="M45 58v24" stroke="#4c3a2e" stroke-width="5"/><rect x="60" y="33" width="4" height="16" fill="#a8453a"/></g>
+
+  <!-- 30 car -->
+  <g transform="translate(0 480)" filter="url(#shadow)"><polygon points="10,58 48,78 86,58 48,39" fill="#455e70" class="o"/><polygon points="25,44 48,56 71,44 61,29 38,29" fill="#6f8795" class="o"/><polygon points="34,35 48,42 61,35 57,30 39,30" fill="#a5c0c5"/><circle cx="27" cy="66" r="7" fill="#1d2020"/><circle cx="69" cy="66" r="7" fill="#1d2020"/></g>
+  <!-- 31 trash -->
+  <g transform="translate(96 480)" filter="url(#shadow)"><ellipse cx="48" cy="33" rx="17" ry="8" fill="#667069" class="o"/><path d="M31 33l4 38 13 8 13-8 4-38" fill="#56605a" class="o"/><path d="M36 45l24 0M38 56l20 0" class="hi"/></g>
+  <!-- 32 rug -->
+  <g transform="translate(192 480)"><polygon points="20,42 48,56 76,42 48,28" fill="#7e4f45" class="o"/><polygon points="28,42 48,52 68,42 48,32" fill="none" stroke="#c09075" stroke-width="2"/></g>
+  <!-- 33 lamp -->
+  <g transform="translate(288 480)" filter="url(#shadow)"><path d="M48 25v38" stroke="#5f4c3d" stroke-width="4"/><path d="M32 35h32l-7-16H39z" fill="#d6c897" class="o"/><ellipse cx="48" cy="68" rx="14" ry="6" fill="#6e5945" class="o"/></g>
+  <!-- 34 porch -->
+  <g transform="translate(384 480)"><polygon points="14,43 48,60 82,43 48,26" fill="#8b806e" class="o"/><path d="M24 43l24-12 24 12M31 47l17-9 17 9" stroke="#b8aa91" stroke-width="1"/></g>
+  <!-- 35 hedge -->
+  <g transform="translate(480 480)" filter="url(#shadow)"><ellipse cx="48" cy="62" rx="33" ry="12" fill="#334b2e"/><circle cx="29" cy="49" r="16" fill="#4d6a45"/><circle cx="49" cy="45" r="19" fill="#56764c"/><circle cx="69" cy="50" r="15" fill="#47633f"/></g>
+</svg>
