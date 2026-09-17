@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#11150f" />
+    <title>LAST BLOCK // SURVIVAL V1</title>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <header class="topbar">
+      <div class="brand"><strong>LAST BLOCK</strong><span> SURVIVAL V1</span></div>
+      <div class="clock"><span id="day-label">DAY 1</span><strong id="time-label">08:00</strong></div>
+      <div class="top-actions">
+        <span id="status-label">QUIET</span>
+        <button id="inventory-button" type="button">INVENTORY <kbd>I</kbd></button>
+      </div>
+    </header>
+
+    <aside class="moodles">
+      <div class="moodle hp"><span>HP</span><div><i id="hp-bar"></i></div><b id="hp-value">100</b></div>
+      <div class="moodle"><span>HUNGER</span><div><i id="hunger-bar"></i></div><b id="hunger-value">8</b></div>
+      <div class="moodle"><span>THIRST</span><div><i id="thirst-bar"></i></div><b id="thirst-value">10</b></div>
+      <div class="moodle"><span>FATIGUE</span><div><i id="fatigue-bar"></i></div><b id="fatigue-value">6</b></div>
+      <div class="moodle danger"><span>BLEED</span><div><i id="bleed-bar"></i></div><b id="bleed-value">0</b></div>
+      <div class="moodle danger"><span>PAIN</span><div><i id="pain-bar"></i></div><b id="pain-value">0</b></div>
+    </aside>
+
+    <section id="inventory-window" class="inventory-window hidden" aria-label="Inventory">
+      <div class="window-header">
+        <div>
+          <strong>INVENTORY</strong>
+          <span id="weight-label">0 / 8 kg</span>
+        </div>
+        <button id="close-inventory" type="button" aria-label="Close inventory">×</button>
+      </div>
+
+      <div class="inventory-grid">
+        <section class="pane">
+          <div class="pane-title">ON SURVIVOR</div>
+          <div id="inventory-list" class="item-list"></div>
+          <button id="bandage-button" class="wide-action" type="button">BANDAGE WOUND</button>
+        </section>
+
+        <section class="pane loot-pane">
+          <div class="pane-title">NEARBY CONTAINER</div>
+          <div id="loot-name" class="loot-name">NO CONTAINER OPEN</div>
+          <div id="loot-list" class="item-list"></div>
+          <button id="take-all-button" class="wide-action" type="button">TAKE ALL</button>
+        </section>
+      </div>
+
+      <div class="save-row">
+        <button id="save-button" type="button">SAVE WORLD</button>
+        <button id="load-button" type="button">LOAD</button>
+        <button id="new-button" type="button">NEW SURVIVOR</button>
+      </div>
+    </section>
+
+    <div id="interaction-prompt" class="interaction-prompt">I · INVENTORY // MOVE QUIETLY · SEARCH BUILDINGS</div>
+    <div id="event-feed" class="event-feed"></div>
+    <div class="controls">WASD MOVE · SHIFT SPRINT · E INTERACT / SEARCH · F SMASH WINDOW · SPACE KNIFE · B BANDAGE · I INVENTORY · WHEEL ZOOM</div>
+
+    <div id="death-screen" class="death-screen hidden">
+      <div class="death-kicker">SURVIVOR LOST</div>
+      <h1>THIS IS HOW YOU DIED.</h1>
+      <p>The neighborhood keeps its state. Load your save or start another survivor.</p>
+      <button id="death-load" type="button">LOAD LAST SAVE</button>
+      <button id="death-new" type="button">NEW SURVIVOR</button>
+    </div>
+
+    <div id="boot-status" class="boot-status">BUILDING NEIGHBORHOOD…</div>
+    <script type="module" src="/src/pz-survival-v1.ts"></script>
+  </body>
+</html>
