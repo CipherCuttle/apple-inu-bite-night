@@ -1,0 +1,115 @@
+@import './apocalypse-playable.css';
+
+:root {
+  --acid-cyan: #70efff;
+  --knife-pink: #ff4fd2;
+  --night-violet: #9b5cff;
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 28%, rgba(82, 227, 255, 0.10), transparent 28%),
+    radial-gradient(circle at 78% 66%, rgba(255, 43, 92, 0.11), transparent 32%),
+    #020205;
+}
+
+.bounty-strip {
+  border-color: rgba(110, 229, 255, 0.35);
+  box-shadow:
+    0 18px 70px rgba(0,0,0,0.42),
+    0 0 28px rgba(87, 220, 255, 0.08),
+    inset 0 0 0 1px rgba(255,255,255,0.025);
+}
+
+.run-strip {
+  border-color: rgba(255, 79, 210, 0.32);
+}
+
+.bounty-main strong {
+  color: #9dffba;
+  text-shadow: 0 0 18px rgba(122, 255, 164, 0.22);
+}
+
+.v2-mission {
+  border-color: rgba(101, 231, 255, 0.38);
+  box-shadow:
+    0 30px 120px rgba(0,0,0,0.65),
+    0 0 70px rgba(91, 217, 255, 0.10),
+    inset 0 0 0 1px rgba(255,255,255,0.035);
+}
+
+.v2-mission h1 {
+  letter-spacing: -0.045em;
+  text-shadow:
+    3px 3px 0 rgba(255, 52, 162, 0.18),
+    -3px -2px 0 rgba(74, 225, 255, 0.12);
+}
+
+.v2-mission p b {
+  color: #ff8de7;
+}
+
+.mission-terms div:nth-child(2) b {
+  color: #79eaff;
+}
+
+.mission-terms div:nth-child(3) b {
+  color: #ff76dc;
+}
+
+.combat-callout {
+  position: fixed;
+  right: 20px;
+  bottom: 54px;
+  z-index: 31;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 9px 12px;
+  border-right: 2px solid rgba(255, 79, 210, 0.72);
+  background: linear-gradient(90deg, transparent, rgba(7,4,11,0.76));
+  opacity: 0.72;
+  transition: opacity 160ms ease;
+}
+
+body.running .combat-callout {
+  opacity: 0.96;
+}
+
+.combat-callout strong {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  color: #fff;
+  letter-spacing: 0.08em;
+  text-shadow:
+    2px 0 0 rgba(255, 48, 199, 0.42),
+    -2px 0 0 rgba(62, 226, 255, 0.35);
+}
+
+.combat-callout span {
+  color: #9f8baa;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.controls b {
+  color: #ff7cdf;
+}
+
+body.running::after {
+  opacity: 0.22;
+}
+
+body.verified .combat-callout,
+body.failed .combat-callout {
+  opacity: 0.2;
+}
+
+@media (max-width: 760px) {
+  .combat-callout {
+    display: none;
+  }
+}

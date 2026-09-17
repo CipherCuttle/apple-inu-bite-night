@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#030206" />
+    <title>APOCALYPSE V2 // NIGHTMART</title>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <div class="hud-shell">
+      <div class="bounty-strip">
+        <div class="eyebrow">LIVE CONTRACT // NIGHTMART 24/7</div>
+        <div class="bounty-main">
+          <span>SURVIVE 15s + 3 KILLS</span>
+          <strong>25 TEST USDC</strong>
+        </div>
+        <div class="bounty-meta">
+          <span id="hud-contract">JOB —</span>
+          <span id="hud-seed">SEED HIDDEN</span>
+          <span id="hud-state">OPEN</span>
+        </div>
+      </div>
+
+      <div class="run-strip">
+        <span id="run-time">T 0.0s / 15.0s</span>
+        <span id="run-kills">KILLS 0/3</span>
+        <span id="run-hp">HP —</span>
+        <span id="run-style">STYLE D</span>
+      </div>
+    </div>
+
+    <section id="mission-screen" class="mission-screen v2-mission">
+      <div class="mission-kicker">OPEN BOUNTY // NIGHTMART PARKING LOT</div>
+      <h1>THE STORE IS FUCKED.</h1>
+      <p>
+        Go through the horde, survive the contract window, and make the blade look expensive.
+        <b>E is the ninja stab.</b>
+      </p>
+      <div class="mission-terms">
+        <div><span>OBJECTIVE</span><b>15 SEC + 3 KILLS</b></div>
+        <div><span>MAP</span><b>STORE + PARKING LOT</b></div>
+        <div><span>SPECIAL</span><b>E // NINJA STAB</b></div>
+      </div>
+      <button id="accept-job" type="button">TAKE THE JOB</button>
+      <div class="mission-note">Replay verification still gates payout. FX / Rapier never decide the result.</div>
+    </section>
+
+    <section id="result-screen" class="result-screen hidden">
+      <div id="result-kicker" class="result-kicker">RUN COMPLETE</div>
+      <h2 id="result-title">BOUNTY CLEARED</h2>
+      <pre id="result-receipt"></pre>
+      <button id="run-again" type="button">RUN IT AGAIN</button>
+    </section>
+
+    <div class="combat-callout">
+      <strong>E // NINJA STAB</strong>
+      <span>lunge · afterimage · pierce line · directional blood</span>
+    </div>
+
+    <div class="controls">
+      WASD MOVE · MOUSE AIM · LMB/SPACE SLASH · <b>E NINJA STAB</b> · Q WHIRLWIND · C DODGE · HOLD/RELEASE SHIFT DASH
+    </div>
+
+    <div id="boot-status" class="boot-status">LOADING NIGHTMART / PIXI / RAPIER / REPLAY…</div>
+    <script type="module" src="/src/apocalypse-v2.ts"></script>
+  </body>
+</html>
