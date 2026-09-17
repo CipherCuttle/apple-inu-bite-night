@@ -6,6 +6,8 @@ export interface PropState {
   x: number
   y: number
   radius: number
+  halfWidth: number
+  halfHeight: number
   hp: number
   maxHp: number
   material: PropMaterial
@@ -39,6 +41,8 @@ function makeProp(
     x,
     y,
     radius,
+    halfWidth: radius,
+    halfHeight: radius,
     hp,
     maxHp: hp,
     material,
