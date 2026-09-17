@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bean // Graphics Stack Bake-Off V1</title>
+    <style>
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #030207; color: #f4edff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      body { display: grid; place-items: center; }
+      #frame { width: min(100vw, 177.777vh); aspect-ratio: 16 / 9; position: relative; background: #030207; box-shadow: 0 0 100px rgba(92, 46, 170, .28); }
+      #stage, #stage canvas { width: 100%; height: 100%; display: block; }
+      #modes { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; z-index: 20; }
+      #modes a { color: #bca9dc; text-decoration: none; border: 1px solid rgba(197, 171, 255, .28); padding: 7px 10px; background: rgba(4, 3, 8, .75); font-size: 11px; letter-spacing: .08em; }
+      #modes a.active { color: #fff; border-color: #b788ff; box-shadow: 0 0 18px rgba(140, 77, 255, .34); }
+      #hint { position: absolute; left: 18px; bottom: 15px; z-index: 20; padding: 8px 10px; border: 1px solid rgba(190,164,255,.22); background: rgba(5,4,9,.75); color: #bdaaff; font-size: 10px; letter-spacing: .05em; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="frame">
+      <div id="stage"></div>
+      <nav id="modes">
+        <a data-mode="A" href="?mode=A">A RAW PIXI</a>
+        <a data-mode="B" href="?mode=B">B MAX FX</a>
+        <a data-mode="C" href="?mode=C">C FX + LIGHT + RAPIER</a>
+      </nav>
+      <div id="hint">WASD MOVE · MOUSE AIM · LMB DETONATE · SAME SCENE / SAME 120 ZOMBIES</div>
+    </div>
+    <script type="module" src="./graphics-bakeoff.js"></script>
+  </body>
+</html>
