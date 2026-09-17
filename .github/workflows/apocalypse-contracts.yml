@@ -1,0 +1,50 @@
+name: apocalypse-contracts
+
+on:
+  push:
+    branches:
+      - experiment/apocalypse-contracts-v0
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'foundry.toml'
+      - 'src/game/contracts/**'
+      - 'tests/apocalypse-contracts.test.ts'
+      - '.github/workflows/apocalypse-contracts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run escrow contract tests
+        run: forge test -vvv
+
+  replay-verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        run: corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Verify deterministic contract receipts
+        run: pnpm vitest run tests/apocalypse-contracts.test.ts tests/determinism.test.ts
