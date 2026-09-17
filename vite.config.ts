@@ -16,6 +16,7 @@ export default defineConfig({
         pzSurvival: 'pz-survival.html',
         pzSurvivalV1: 'pz-survival-v1.html',
         pzHouseArt: 'pz-house-art.html',
+        pzRealTileset: 'pz-real-tileset.html',
       },
     },
   },

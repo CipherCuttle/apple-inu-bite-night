@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#d9d0bb" />
+    <title>LAST BLOCK // REAL TILESET INTAKE V0</title>
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <header class="topbar">
+      <div><strong>LAST BLOCK</strong><span> MAPLE STREET // REAL TILESET INTAKE V0</span></div>
+      <div class="clock"><strong>DAY 1</strong><span>09:18</span></div>
+    </header>
+
+    <aside class="moodles" aria-label="Survivor status">
+      <div><span>HP</span><i style="--v:92%"></i></div>
+      <div><span>HUNGER</span><i style="--v:18%"></i></div>
+      <div><span>THIRST</span><i style="--v:24%"></i></div>
+      <div><span>FATIGUE</span><i style="--v:11%"></i></div>
+    </aside>
+
+    <section id="inventory-window" class="tool-window inventory hidden" data-window>
+      <header class="window-handle"><strong>INVENTORY</strong><span id="weight-label">1.1 / 8 KG</span><button id="close-inventory" type="button">×</button></header>
+      <div id="inventory-list" class="rows"></div>
+      <footer><button id="save-button" type="button">SAVE</button><button id="load-button" type="button">LOAD</button></footer>
+    </section>
+
+    <section id="loot-window" class="tool-window loot hidden" data-window>
+      <header class="window-handle"><strong id="loot-title">CONTAINER</strong><span>NEARBY</span><button id="close-loot" type="button">×</button></header>
+      <div id="loot-list" class="rows"></div>
+      <footer><button id="take-all" type="button">TAKE ALL</button></footer>
+    </section>
+
+    <div id="interaction-prompt" class="interaction-prompt">WASD MOVE · E OPEN / SEARCH · I INVENTORY · WHEEL ZOOM</div>
+    <div id="event-feed" class="event-feed"></div>
+    <div class="taste-note">REAL CC0 FLOOR + WALL + FURNITURE ASSETS · SAME HOUSE DATA</div>
+    <div id="boot-status" class="boot-status">LOADING REAL TILESET…</div>
+
+    <script type="module" src="/src/pz-real-tileset.ts"></script>
+  </body>
+</html>
