@@ -1,0 +1,86 @@
+name: pz-survival-v1
+
+on:
+  push:
+    branches:
+      - 'phase/pz-survival-v1'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pz-survival-v1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-capture-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm test:determinism
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Preserve escrow regression gate
+        run: forge test -q
+
+      - name: Start tested browser build
+        run: |
+          python3 -m http.server 4173 --directory dist > /tmp/pz-survival-v1.log 2>&1 &
+          echo $! > /tmp/pz-survival-v1.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/pz-survival-v1.html >/dev/null; then break; fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:4173/pz-survival-v1.html >/dev/null
+
+      - name: Capture houses and working inventory
+        run: |
+          pnpm dlx playwright@1.55.0 install --with-deps chromium
+          pnpm dlx playwright@1.55.0 screenshot \
+            --viewport-size=1280,720 \
+            --wait-for-timeout=2800 \
+            'http://127.0.0.1:4173/pz-survival-v1.html?autotest=1' \
+            pz-survival-v1.png
+
+      - name: Upload survival V1 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pz-survival-v1-${{ github.sha }}
+          path: |
+            pz-survival-v1.png
+            dist
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop local preview server
+        if: always()
+        run: |
+          if [ -f /tmp/pz-survival-v1.pid ]; then kill "$(cat /tmp/pz-survival-v1.pid)" || true; fi
+
+      - name: Publish stable GitHack preview
+        run: |
+          cp -R dist /tmp/pz-survival-v1-tested-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-pz-survival-v1
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R /tmp/pz-survival-v1-tested-dist/. .
+          touch .nojekyll
+          printf '%s\n' "$GITHUB_SHA" > BUILD_SHA
+          git add -A
+          git commit -m "preview(pz-survival-v1): ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-pz-survival-v1
