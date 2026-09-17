@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#08050d" />
+    <title>Apocalypse Contracts V0</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: #08050d; color: #f5f0ff; overflow-x: hidden; }
+      body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .12; background: repeating-linear-gradient(0deg, transparent 0 3px, #9d67ff 4px); mix-blend-mode: screen; z-index: 20; }
+      #shell { width: min(1180px, 100%); margin: 0 auto; padding: 18px; }
+      header { display: flex; gap: 18px; justify-content: space-between; align-items: end; margin-bottom: 12px; }
+      .eyebrow { color: #a983ff; letter-spacing: .18em; font-size: 11px; }
+      h1 { margin: 4px 0 0; font-size: clamp(22px, 4vw, 42px); line-height: .95; letter-spacing: -.045em; }
+      .warning { max-width: 430px; font-size: 11px; color: #b9aeca; text-align: right; }
+      #layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 12px; }
+      .panel { background: #100b18; border: 1px solid #3a2852; box-shadow: 0 0 0 1px #08050d, 0 12px 50px #0008; }
+      #contract { padding: 16px; position: relative; overflow: hidden; }
+      #contract::after { content: 'ESCROW'; position: absolute; right: -28px; top: 26px; transform: rotate(40deg); background: #55238c; color: #e9dfff; padding: 4px 36px; font-size: 10px; letter-spacing: .18em; }
+      .label { color: #897a9c; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; margin-top: 14px; }
+      .value { margin-top: 4px; font-size: 17px; font-weight: 800; }
+      .reward { color: #b8ff85; font-size: 28px; }
+      #status { margin: 16px 0 12px; padding: 10px; min-height: 58px; border: 1px solid #3a2852; background: #0b0710; font-size: 11px; line-height: 1.45; white-space: pre-line; }
+      button { width: 100%; border: 1px solid #7b47bf; background: #5f2a9a; color: white; font: inherit; font-weight: 900; padding: 12px; cursor: pointer; text-transform: uppercase; letter-spacing: .08em; }
+      button:hover { background: #7435b8; }
+      button:disabled { opacity: .4; cursor: default; }
+      #new-job { margin-top: 8px; background: #16101e; border-color: #3a2852; }
+      #game-panel { position: relative; min-width: 0; }
+      canvas { display: block; width: 100%; aspect-ratio: 16 / 9; background: #090610; image-rendering: pixelated; cursor: crosshair; }
+      #gate { position: absolute; inset: 0; display: grid; place-items: center; background: #090610e8; z-index: 5; text-align: center; padding: 30px; }
+      #gate.hidden { display: none; }
+      #gate strong { display: block; font-size: 25px; margin-bottom: 9px; }
+      #gate span { color: #aa9bbd; font-size: 12px; max-width: 510px; }
+      #hudline { display: flex; flex-wrap: wrap; gap: 8px 16px; border-top: 1px solid #30233e; padding: 9px 12px; color: #aaa0b8; font-size: 10px; background: #0d0913; }
+      #receipt { margin-top: 12px; padding: 12px; border: 1px dashed #46325b; font-size: 10px; line-height: 1.55; color: #a99bb7; overflow-wrap: anywhere; }
+      #receipt.pass { border-color: #6cad46; color: #baff94; }
+      #receipt.fail { border-color: #9e3a54; color: #ff91ad; }
+      .controls { margin-top: 14px; font-size: 10px; line-height: 1.6; color: #91839f; }
+      @media (max-width: 820px) { #layout { grid-template-columns: 1fr; } header { align-items: start; flex-direction: column; } .warning { text-align: left; } }
+    </style>
+    <script type="module" crossorigin src="./assets/contracts-D68aAouM.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/FixedTick-gP4o_b5M.js">
+  </head>
+  <body>
+    <div id="shell">
+      <header>
+        <div><div class="eyebrow">APOCALYPSE CONTRACTS // V0</div><h1>DO THE JOB.<br>PROVE THE RUN.</h1></div>
+        <div class="warning">LOCAL PREVIEW • NO WALLET • NO REAL FUNDS<br>Deterministic replay verification is real. Chain payout is deliberately not connected in this GitHack harness.</div>
+      </header>
+      <div id="layout">
+        <aside id="contract" class="panel">
+          <div class="label">Contract</div><div class="value" id="contract-id">—</div>
+          <div class="label">Reward</div><div class="value reward">5.00 TEST USDC</div>
+          <div class="label">Objective</div><div class="value">SURVIVE 12s + 1 KILL</div>
+          <div class="label">Seed</div><div class="value" id="seed">HIDDEN UNTIL ACCEPT</div>
+          <div id="status">OPEN
+Sponsor escrowed test value.</div>
+          <button id="accept">Accept job</button>
+          <button id="new-job">Generate new job</button>
+          <div class="controls"><b>WASD</b> move<br><b>Mouse</b> aim • <b>LMB/Space</b> slash<br><b>E</b> stab • <b>Q</b> whirlwind<br><b>C</b> dodge • hold/release <b>Shift</b> dash</div>
+          <div id="receipt">No replay receipt yet.</div>
+        </aside>
+        <main id="game-panel" class="panel">
+          <canvas id="game" width="960" height="540"></canvas>
+          <div id="gate"><div><strong>CONTRACT NOT ACCEPTED</strong><span>The simulation is frozen. Accept the funded job to reveal the seed and start recording your deterministic replay.</span></div></div>
+          <div id="hudline"><span id="time">T 0.0s</span><span id="kills">KILLS 0</span><span id="hp">HP —</span><span id="hash">HASH —</span><span>MECHANICS HARNESS • final Pixi renderer comes later</span></div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
