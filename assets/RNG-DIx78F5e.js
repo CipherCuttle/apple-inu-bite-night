@@ -1,0 +1,1 @@
+var e=class{state;constructor(e){this.state=e|0,this.state===0&&(this.state=1831565813)}nextU32(){let e=this.state|0;return e^=e<<13,e^=e>>>17,e^=e<<5,this.state=e|0,e>>>0}next(){return this.nextU32()/4294967296}range(e,t){return e+(t-e)*this.next()}int(e,t){return Math.floor(this.range(e,t+1))}snapshot(){return this.state>>>0}};export{e as t};
