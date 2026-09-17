@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+    <linearGradient id="coat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#453250"/>
+      <stop offset="0.55" stop-color="#241b2d"/>
+      <stop offset="1" stop-color="#120f16"/>
+    </linearGradient>
+    <linearGradient id="hood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8f5eb8"/>
+      <stop offset="0.45" stop-color="#49305f"/>
+      <stop offset="1" stop-color="#211827"/>
+    </linearGradient>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <ellipse cx="128" cy="188" rx="56" ry="25" fill="#050308" opacity="0.72"/>
+    <path d="M88 162 C88 121 100 91 128 82 C156 91 168 121 168 162 L158 211 L98 211 Z" fill="url(#coat)" stroke="#8d69a3" stroke-width="4"/>
+    <path d="M103 92 C99 63 111 39 128 34 C145 39 157 63 153 92 C146 110 110 110 103 92 Z" fill="url(#hood)" stroke="#a975c9" stroke-width="4"/>
+    <path d="M110 70 C117 56 139 56 146 70 L144 93 C137 101 119 101 112 93 Z" fill="#100d14"/>
+    <ellipse cx="120" cy="80" rx="8.5" ry="7" fill="#c9f3ff"/>
+    <ellipse cx="136" cy="80" rx="8.5" ry="7" fill="#c9f3ff"/>
+    <ellipse cx="121" cy="81" rx="3" ry="3.5" fill="#17131b"/>
+    <ellipse cx="137" cy="81" rx="3" ry="3.5" fill="#17131b"/>
+    <path d="M115 99 L141 99 L137 109 L119 109 Z" fill="#6f4055" opacity="0.85"/>
+    <path d="M94 126 L68 164 L82 176 L110 148 Z" fill="#33263c" stroke="#6b4b7c" stroke-width="4"/>
+    <path d="M162 126 L188 164 L174 176 L146 148 Z" fill="#33263c" stroke="#6b4b7c" stroke-width="4"/>
+    <rect x="107" y="137" width="42" height="18" rx="4" fill="#17131b" stroke="#5e476a" stroke-width="3"/>
+    <path d="M109 170 L101 219 L119 222 L128 178 Z" fill="#17131b"/>
+    <path d="M147 170 L155 219 L137 222 L128 178 Z" fill="#17131b"/>
+    <rect x="95" y="216" width="29" height="12" rx="4" fill="#0e0b10"/>
+    <rect x="132" y="216" width="29" height="12" rx="4" fill="#0e0b10"/>
+    <path d="M101 120 L155 120" stroke="#ff4f7a" stroke-width="5" opacity="0.9"/>
+    <circle cx="128" cy="120" r="6" fill="#ff4f7a"/>
+  </g>
+</svg>
