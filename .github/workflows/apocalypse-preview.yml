@@ -1,0 +1,42 @@
+name: apocalypse-preview
+
+on:
+  push:
+    branches: [experiment/apocalypse-contracts-v0]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apocalypse-preview
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm vitest run tests/apocalypse-contracts.test.ts tests/determinism.test.ts
+      - run: pnpm build
+      - name: Publish tested GitHack branch
+        run: |
+          cp -R dist /tmp/apocalypse-contracts-dist
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan preview-apocalypse-contracts
+          cp -R /tmp/apocalypse-contracts-dist/. .
+          touch .nojekyll
+          printf '%s\n' "${GITHUB_SHA}" > BUILD_SHA
+          git add -A
+          git commit -m "preview: ${GITHUB_SHA}"
+          git push --force origin HEAD:preview-apocalypse-contracts
