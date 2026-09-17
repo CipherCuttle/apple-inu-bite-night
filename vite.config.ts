@@ -12,6 +12,7 @@ export default defineConfig({
         main: 'index.html',
         contracts: 'contracts-demo.html',
         apocalypseV2: 'apocalypse-v2.html',
+        apocalypseV3: 'apocalypse-v3.html',
       },
     },
   },
