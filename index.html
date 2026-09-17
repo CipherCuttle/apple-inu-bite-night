@@ -3,11 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#09060f" />
-    <title>Apple Inu: Bite Night</title>
+    <meta name="theme-color" content="#050308" />
+    <title>APOCALYPSE // BOUNTY RUN</title>
   </head>
   <body>
-    <div id="game"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="stage"></div>
+
+    <div class="hud-shell" aria-live="polite">
+      <div class="bounty-strip">
+        <div class="eyebrow">LIVE CONTRACT // TEST VALUE</div>
+        <div class="bounty-main">
+          <span id="hud-objective">SURVIVE 15s + 3 KILLS</span>
+          <strong id="hud-reward">25 TEST USDC</strong>
+        </div>
+        <div class="bounty-meta">
+          <span id="hud-contract">JOB —</span>
+          <span id="hud-seed">SEED HIDDEN</span>
+          <span id="hud-state">OPEN</span>
+        </div>
+      </div>
+
+      <div class="run-strip">
+        <span id="run-time">T 0.0s</span>
+        <span id="run-kills">KILLS 0/3</span>
+        <span id="run-hp">HP —</span>
+        <span id="run-style">STYLE D</span>
+      </div>
+    </div>
+
+    <section id="mission-screen" class="mission-screen">
+      <div class="mission-kicker">OPEN BOUNTY // NIGHT DISTRICT 06</div>
+      <h1>MAKE IT TO DAWN.</h1>
+      <p>
+        Someone locked test value against a simple job: survive the horde and leave enough bodies behind to prove you were here.
+      </p>
+      <div class="mission-terms">
+        <div><span>OBJECTIVE</span><b>15 SEC + 3 KILLS</b></div>
+        <div><span>REWARD</span><b>25 TEST USDC</b></div>
+        <div><span>PROOF</span><b>DETERMINISTIC REPLAY</b></div>
+      </div>
+      <button id="accept-job" type="button">TAKE THE JOB</button>
+      <div class="mission-note">No wallet transaction in this preview. A verified receipt is the payout gate.</div>
+    </section>
+
+    <section id="result-screen" class="result-screen hidden">
+      <div id="result-kicker" class="result-kicker">RUN COMPLETE</div>
+      <h2 id="result-title">CONTRACT VERIFIED</h2>
+      <pre id="result-receipt"></pre>
+      <button id="run-again" type="button">RUN IT AGAIN</button>
+    </section>
+
+    <div class="controls">
+      WASD MOVE · MOUSE AIM · LMB/SPACE SLASH · E STAB · Q WHIRLWIND · C DODGE · HOLD SHIFT, RELEASE DASH
+    </div>
+
+    <div id="boot-status" class="boot-status">LOADING PIXI / FX / PHYSICS…</div>
+    <script type="module" src="/src/apocalypse-playable.ts"></script>
   </body>
 </html>
