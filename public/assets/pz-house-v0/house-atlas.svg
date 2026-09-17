@@ -21,9 +21,9 @@
   <g transform="translate(480 0)"><polygon points="48,24 82,41 48,58 14,41" fill="#6f776d"/><path d="M25 40l23-11 23 11-23 12z" fill="none" stroke="#879087" stroke-width="1" opacity=".65"/></g>
 
   <!-- 6 exterior wall -->
-  <g transform="translate(0 96)" filter="url(#shadow)"><polygon points="18,69 48,84 78,69 48,54" fill="#c6b798" class="o"/><polygon points="18,69 48,84 48,35 18,20" fill="#766958" class="o"/><polygon points="78,69 48,84 48,35 78,20" fill="#998970" class="o"/><path d="M23 31l20 10m-20 7l20 10M73 31L53 41m20 7L53 58" class="hi"/></g>
+  <g transform="translate(0 96)" filter="url(#shadow)"><polygon points="16,62 48,78 80,62 48,46" fill="#cfc3aa" stroke="#3a332b" stroke-width="1.4"/><polygon points="16,62 48,78 48,47 16,31" fill="#796d5c" stroke="#3a332b" stroke-width="1.4"/><polygon points="80,62 48,78 48,47 80,31" fill="#9f9077" stroke="#3a332b" stroke-width="1.4"/><path d="M22 39l21 10m-21 7l21 10M74 39L53 49m21 7L53 66" stroke="#efe5d3" stroke-opacity=".27" stroke-width="1"/></g>
   <!-- 7 interior wall -->
-  <g transform="translate(96 96)" filter="url(#shadow)"><polygon points="18,69 48,84 78,69 48,54" fill="#d7d0c2" class="o"/><polygon points="18,69 48,84 48,35 18,20" fill="#8b8376" class="o"/><polygon points="78,69 48,84 48,35 78,20" fill="#aaa194" class="o"/><path d="M24 34l19 9m-19 8l19 9" class="hi"/></g>
+  <g transform="translate(96 96)" filter="url(#shadow)"><polygon points="16,64 48,79 80,64 48,49" fill="#ddd8ca" stroke="#4c453c" stroke-width="1.2"/><polygon points="16,64 48,79 48,53 16,38" fill="#9c9487" stroke="#4c453c" stroke-width="1.2"/><polygon points="80,64 48,79 48,53 80,38" fill="#b7aea1" stroke="#4c453c" stroke-width="1.2"/><path d="M23 46l20 9m-20 7l20 9" stroke="#fff" stroke-opacity=".22" stroke-width="1"/></g>
   <!-- 8 roof -->
   <g transform="translate(192 96)" filter="url(#shadow)"><polygon points="48,12 87,35 48,60 9,35" fill="url(#roof)" class="o"/><path d="M18 35l30-17 30 17M25 39l23-13 23 13M32 43l16-9 16 9" stroke="#ad685b" stroke-width="1.2" opacity=".6"/></g>
   <!-- 9 ridge -->
