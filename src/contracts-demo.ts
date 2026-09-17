@@ -4,8 +4,7 @@ import { FixedTick } from './game/sim/FixedTick'
 import { MAZE_CELL_SIZE, MAZE_EXIT, MAZE_GRID, MAZE_ORIGIN_X, MAZE_ORIGIN_Y } from './game/world/Maze'
 
 const canvas = required<HTMLCanvasElement>('game')
-const ctx = canvas.getContext('2d')
-if (!ctx) throw new Error('Canvas 2D unavailable')
+const ctx = canvas.getContext('2d')!
 
 const acceptButton = required<HTMLButtonElement>('accept')
 const newJobButton = required<HTMLButtonElement>('new-job')
